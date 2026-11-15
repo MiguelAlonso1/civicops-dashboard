@@ -6,17 +6,13 @@ Built with .NET 11, Blazor (Interactive Server), MudBlazor, EF Core + SQLite and
 
 ## Screenshots
 
-| Overview (dark) | Requests grid (dark) |
+| Overview (dark) | Requests grid (light) |
 | --- | --- |
-| ![Overview dashboard, dark theme](docs/screenshots/dashboard-dark-1440.png) | ![Requests grid, dark theme](docs/screenshots/requests-dark-1440.png) |
+| ![Overview dashboard, dark theme](docs/screenshots/dashboard-dark-1440.png) | ![Requests grid, light theme](docs/screenshots/requests-light-1440.png) |
 
-| Request detail (light) | Try the demo login (dark) |
+| Request detail (dark) | Mobile overview (390px, dark) |
 | --- | --- |
-| ![Request detail with timeline, light theme](docs/screenshots/detail-light-1440.png) | ![Demo login page, dark theme](docs/screenshots/login-dark-1440.png) |
-
-| Mobile overview (390px, dark) | Mobile requests (390px, light) |
-| --- | --- |
-| ![Mobile overview](docs/screenshots/dashboard-dark-390.png) | ![Mobile requests list](docs/screenshots/requests-light-390.png) |
+| ![Request detail with timeline, dark theme](docs/screenshots/detail-dark-1440.png) | ![Mobile overview](docs/screenshots/dashboard-dark-390.png) |
 
 ## Features
 - **Overview**: KPI tiles (open, overdue, average resolution time, SLA compliance) and charts: requests per week (line), by category (donut), by district (bar), SLA compliance trend (line).

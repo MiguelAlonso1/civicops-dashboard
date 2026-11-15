@@ -59,33 +59,41 @@
     </div>
 
     <MudDataGrid T="RequestRow" @ref="_grid" ServerData="LoadAsync" Hover="true" Dense="true" Bordered="false" Elevation="0"
-                 SortMode="SortMode.Single" Filterable="false" Breakpoint="Breakpoint.Sm" RowClass="row-link" RowClick="OnRowClick"
+                 SortMode="SortMode.Single" Filterable="false" Breakpoint="Breakpoint.None" RowClass="row-link" RowClick="OnRowClick"
                  aria-label="Service requests">
         <Columns>
-            <PropertyColumn Property="x => x.Number" Title="Number" Sortable="true" InitialDirection="SortDirection.None">
-
+            <PropertyColumn Property="x => x.Number" Title="Number" Sortable="true" InitialDirection="SortDirection.None" HeaderClass="d-none d-sm-table-cell" CellClass="d-none d-sm-table-cell number-cell">
                 <CellTemplate><MudLink Href="@($"/requests/{context.Item.Id}")" Underline="Underline.Hover" aria-label="@($"Open request {context.Item.Number}")">@context.Item.Number</MudLink></CellTemplate>
             </PropertyColumn>
             <PropertyColumn Property="x => x.Title" Title="Title" Sortable="true">
-                <CellTemplate>@context.Item.Title<div class="cell-sub">@context.Item.Category &middot; @context.Item.District</div></CellTemplate>
+                <CellTemplate>
+                    <MudLink Href="@($"/requests/{context.Item.Id}")" Typo="Typo.caption" Underline="Underline.Hover" Class="d-sm-none number-cell" aria-label="@($"Open request {context.Item.Number}")">@context.Item.Number</MudLink>
+                    <div class="title-cell">@context.Item.Title</div>
+                    <div class="cell-sub">@context.Item.Category &middot; @context.Item.District</div>
+                    <div class="d-flex d-sm-none align-center flex-wrap gap-2 mt-1">
+                        <MudChip T="string" Size="Size.Small" Color="@UiHelpers.PriorityColor(context.Item.Priority)" Variant="Variant.Outlined">@context.Item.Priority</MudChip>
+                        @if (context.Item.IsOverdue(_now))
+                        {
+                            <span class="overdue-text cell-sub">Due @context.Item.DueAt.ToString("MMM d") (overdue)</span>
+                        }
+                        else { <span class="cell-sub">Due @context.Item.DueAt.ToString("MMM d")</span> }
+                    </div>
+                </CellTemplate>
             </PropertyColumn>
-            <PropertyColumn Property="x => x.Priority" Title="Priority" Sortable="true" >
-
+            <PropertyColumn Property="x => x.Priority" Title="Priority" Sortable="true" HeaderClass="d-none d-sm-table-cell" CellClass="d-none d-sm-table-cell">
                 <CellTemplate><MudChip T="string" Size="Size.Small" Color="@UiHelpers.PriorityColor(context.Item.Priority)" Variant="Variant.Outlined">@context.Item.Priority</MudChip></CellTemplate>
             </PropertyColumn>
             <PropertyColumn Property="x => x.Status" Title="Status" Sortable="true" >
 
                 <CellTemplate><MudChip T="string" Size="Size.Small" Color="@UiHelpers.StatusColor(context.Item.Status)" Icon="@UiHelpers.StatusIcon(context.Item.Status)">@StatusRules.Label(context.Item.Status)</MudChip></CellTemplate>
             </PropertyColumn>
-            <PropertyColumn Property="x => x.Assignee" Title="Assignee" Sortable="true">
+            <PropertyColumn Property="x => x.Assignee" Title="Assignee" Sortable="true" HeaderClass="d-none d-lg-table-cell" CellClass="d-none d-lg-table-cell">
                 <CellTemplate>@(context.Item.Assignee ?? "Unassigned")</CellTemplate>
             </PropertyColumn>
-            <PropertyColumn Property="x => x.CreatedAt" Title="Created" Sortable="true" InitialDirection="SortDirection.Descending">
-
+            <PropertyColumn Property="x => x.CreatedAt" Title="Created" Sortable="true" InitialDirection="SortDirection.Descending" HeaderClass="d-none d-lg-table-cell" CellClass="d-none d-lg-table-cell">
                 <CellTemplate>@context.Item.CreatedAt.ToString("MMM d")</CellTemplate>
             </PropertyColumn>
-            <PropertyColumn Property="x => x.DueAt" Title="Due" Sortable="true" >
-
+            <PropertyColumn Property="x => x.DueAt" Title="Due" Sortable="true" HeaderClass="d-none d-sm-table-cell" CellClass="d-none d-sm-table-cell">
                 <CellTemplate>
                     @if (context.Item.IsOverdue(_now))
                     {

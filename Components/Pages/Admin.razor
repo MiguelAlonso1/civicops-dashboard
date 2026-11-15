@@ -18,49 +18,47 @@
 }
 else
 {
-    <MudPaper Class="grid-shell mb-4" Elevation="0">
-        <MudTable Items="_rows" Dense="true" Breakpoint="Breakpoint.Md" Elevation="0" Hover="true" aria-label="Categories and SLA rules">
-            <HeaderContent>
-                <MudTh>Category</MudTh>
-                <MudTh>Department</MudTh>
-                @foreach (var p in Priorities) { <MudTh>@p (h)</MudTh> }
-                <MudTh>Active</MudTh>
-                <MudTh>Requests</MudTh>
-                <MudTh></MudTh>
-            </HeaderContent>
-            <RowTemplate>
-                <MudTd DataLabel="Category"><MudTextField T="string" @bind-Value="context.Name" Variant="Variant.Text" Margin="Margin.Dense" Style="min-width:170px" aria-label="@($"Name of {context.Name}")" /></MudTd>
-                <MudTd DataLabel="Department"><MudTextField T="string" @bind-Value="context.Department" Variant="Variant.Text" Margin="Margin.Dense" Style="min-width:190px" aria-label="@($"Department of {context.Name}")" /></MudTd>
-                @foreach (var p in Priorities)
-                {
-                    var pr = p;
-                    <MudTd DataLabel="@($"{pr} (h)")">
-                        <MudNumericField T="int" Value="context.Hours[pr]" ValueChanged="v => context.Hours[pr] = v" Min="AdminService.MinSlaHours" Max="AdminService.MaxSlaHours"
-                                         Variant="Variant.Outlined" Margin="Margin.Dense" HideSpinButtons="true" Style="min-width:80px;max-width:96px" aria-label="@($"{pr} SLA hours for {context.Name}")" />
-                    </MudTd>
-                }
-                <MudTd DataLabel="Active"><MudSwitch T="bool" @bind-Value="context.IsActive" Color="Color.Primary" aria-label="@($"{context.Name} active")" /></MudTd>
-                <MudTd DataLabel="Requests">@context.RequestCount</MudTd>
-                <MudTd>
-                    <MudTooltip Text="Save this category">
-                        <MudIconButton Icon="@Icons.Material.Rounded.Save" Color="Color.Primary" OnClick="() => SaveAsync(context)" aria-label="@($"Save {context.Name}")" />
-                    </MudTooltip>
-                </MudTd>
-            </RowTemplate>
-        </MudTable>
-    </MudPaper>
+    <div class="d-flex flex-column gap-3 mb-4" role="list" aria-label="Categories and SLA rules">
+        @foreach (var row in _rows)
+        {
+            var context = row;
+            <MudPaper Class="panel auto pa-4" Elevation="0" role="listitem">
+                <MudGrid Spacing="2" Class="align-center">
+                    <MudItem xs="12" sm="6" lg="4"><MudTextField T="string" @bind-Value="context.Name" Label="Category" Variant="Variant.Outlined" Margin="Margin.Dense" aria-label="@($"Name of {context.Name}")" /></MudItem>
+                    <MudItem xs="12" sm="6" lg="4"><MudTextField T="string" @bind-Value="context.Department" Label="Department" Variant="Variant.Outlined" Margin="Margin.Dense" aria-label="@($"Department of {context.Name}")" /></MudItem>
+                    <MudItem xs="12" lg="4">
+                        <div class="d-flex align-center justify-space-between gap-3">
+                            <MudSwitch T="bool" @bind-Value="context.IsActive" Color="Color.Primary" Label="Active" aria-label="@($"{context.Name} active")" />
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">@context.RequestCount requests</MudText>
+                            <MudTooltip Text="Save this category">
+                                <MudIconButton Icon="@Icons.Material.Rounded.Save" Color="Color.Primary" OnClick="() => SaveAsync(context)" aria-label="@($"Save {context.Name}")" />
+                            </MudTooltip>
+                        </div>
+                    </MudItem>
+                    @foreach (var p in Priorities)
+                    {
+                        var pr = p;
+                        <MudItem xs="6" sm="3">
+                            <MudNumericField T="int" Value="context.Hours[pr]" ValueChanged="v => context.Hours[pr] = v" Min="AdminService.MinSlaHours" Max="AdminService.MaxSlaHours"
+                                             Label="@($"{pr} (h)")" Variant="Variant.Outlined" Margin="Margin.Dense" HideSpinButtons="true" aria-label="@($"{pr} SLA hours for {context.Name}")" />
+                        </MudItem>
+                    }
+                </MudGrid>
+            </MudPaper>
+        }
+    </div>
 
     <MudPaper Class="panel pa-4 pa-sm-5 mb-6" Elevation="0">
         <MudText Typo="Typo.h6" Class="mb-3">Add category</MudText>
         <MudGrid Spacing="2">
-            <MudItem xs="12" sm="6" md="3"><MudTextField T="string" @bind-Value="_new.Name" Label="Name" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
-            <MudItem xs="12" sm="6" md="3"><MudTextField T="string" @bind-Value="_new.Department" Label="Department" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+            <MudItem xs="12" sm="6" lg="3"><MudTextField T="string" @bind-Value="_new.Name" Label="Name" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+            <MudItem xs="12" sm="6" lg="3"><MudTextField T="string" @bind-Value="_new.Department" Label="Department" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
             @foreach (var p in Priorities)
             {
                 var pr = p;
-                <MudItem xs="6" sm="3" md="1"><MudNumericField T="int" Value="_new.Hours[pr]" ValueChanged="v => _new.Hours[pr] = v" Label="@($"{pr} h")" Variant="Variant.Outlined" Margin="Margin.Dense" HideSpinButtons="true" /></MudItem>
+                <MudItem xs="6" sm="3" lg="1"><MudNumericField T="int" Value="_new.Hours[pr]" ValueChanged="v => _new.Hours[pr] = v" Label="@($"{pr} h")" Variant="Variant.Outlined" Margin="Margin.Dense" HideSpinButtons="true" /></MudItem>
             }
-            <MudItem xs="12" md="2"><MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" OnClick="() => SaveAsync(_new)" StartIcon="@Icons.Material.Rounded.Add">Add</MudButton></MudItem>
+            <MudItem xs="12" lg="2"><MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" OnClick="() => SaveAsync(_new)" StartIcon="@Icons.Material.Rounded.Add">Add</MudButton></MudItem>
         </MudGrid>
     </MudPaper>
 
@@ -125,9 +123,16 @@ else
             yesText: "Reset", cancelText: "Cancel");
         if (ok != true) return;
         _resetting = true;
-        var res = await Svc.ResetDemoDataAsync(Actor.From((await Auth!).User));
-        Snackbar.Add(res.Ok ? "Demo data was reset." : res.Message ?? "Reset failed.", res.Ok ? Severity.Success : Severity.Error);
-        await LoadAsync();
-        _resetting = false;
+        try
+        {
+            var res = await Svc.ResetDemoDataAsync(Actor.From((await Auth!).User));
+            Snackbar.Add(res.Ok ? "Demo data was reset." : res.Message ?? "Reset failed.", res.Ok ? Severity.Success : Severity.Error);
+            await LoadAsync();
+        }
+        catch (Exception)
+        {
+            Snackbar.Add("Reset failed. Please try again.", Severity.Error);
+        }
+        finally { _resetting = false; }
     }
 }

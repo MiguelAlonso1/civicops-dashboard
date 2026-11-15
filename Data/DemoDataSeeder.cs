@@ -82,6 +82,9 @@ public sealed class DemoDataSeeder(
     /// <summary>Wipes requests, categories, SLA rules and districts, then regenerates them. Users are kept (passwords restored).</summary>
     public async Task ResetAsync(CancellationToken ct = default)
     {
+        // Identity writes use their own connections: run them before the transaction opens,
+        // otherwise SQLite reports "database is locked".
+        await EnsureUsersAsync(restorePasswords: true);
         await using var db = await factory.CreateDbContextAsync(ct);
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         await db.Events.ExecuteDeleteAsync(ct);
@@ -89,7 +92,6 @@ public sealed class DemoDataSeeder(
         await db.SlaRules.ExecuteDeleteAsync(ct);
         await db.Categories.ExecuteDeleteAsync(ct);
         await db.Districts.ExecuteDeleteAsync(ct);
-        await EnsureUsersAsync(restorePasswords: true);
         await SeedDataAsync(db, ct);
         await tx.CommitAsync(ct);
     }

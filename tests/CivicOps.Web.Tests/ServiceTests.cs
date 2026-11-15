@@ -201,6 +201,9 @@ public class ServiceTests(TestApp app) : IClassFixture<TestApp>
         hours[RequestPriority.Urgent] = 0;
         Assert.Equal(Failure.Invalid, (await admin.SaveCategoryAsync(Admin, cat.Id, cat.Name, cat.Department, true, hours)).Failure);
         Assert.Equal(Failure.Forbidden, (await admin.ResetDemoDataAsync(sup)).Failure);
+        // Regression: the reset used to hit "database is locked" (Identity writes inside the seeding transaction).
+        Assert.True((await admin.ResetDemoDataAsync(Admin)).Ok);
+        Assert.NotEmpty(await admin.GetCategoriesAsync());
     }
 
     [Theory]

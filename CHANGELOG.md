@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.1 - 2026-11-15
+
+- Fix: "Reset demo data" failed with "database is locked" (Identity writes ran inside the seeding transaction) and surfaced as an unhandled circuit error; users are now restored before the transaction and failures show a snackbar.
+- Requests grid: Number column never wraps; compact mobile layout (number, title, status chip, priority and due date per row) replaces the stacked cards; Assignee/Created hide below 1280px so tablet widths stay readable.
+- Status chips: "New" uses a clearer icon and all chip icons share one size.
+- Dashboard: "Requests per week" chart height fills its card.
+- Admin: category/SLA editor is now a responsive card grid (no cramped inputs at tablet widths, tidy on mobile); Districts mobile rows align the district name correctly.
+
 ## 1.0.0 - 2026-11-15
 
 Initial release.

@@ -17,7 +17,7 @@ public static class UiHelpers
 
     public static string StatusIcon(RequestStatus s) => s switch
     {
-        RequestStatus.New => Icons.Material.Rounded.FiberNew,
+        RequestStatus.New => Icons.Material.Rounded.NewReleases,
         RequestStatus.InProgress => Icons.Material.Rounded.Autorenew,
         RequestStatus.OnHold => Icons.Material.Rounded.PauseCircle,
         RequestStatus.Resolved => Icons.Material.Rounded.CheckCircle,

@@ -28,7 +28,7 @@ else
                 <MudTh><MudTableSortLabel SortBy="new Func<DistrictRow, object>(x => x.SlaCompliancePct)">SLA compliance</MudTableSortLabel></MudTh>
             </HeaderContent>
             <RowTemplate>
-                <MudTd DataLabel="District"><strong>@context.Code</strong> &middot; @context.Name</MudTd>
+                <MudTd DataLabel="District"><span><strong>@context.Code</strong> &middot; @context.Name</span></MudTd>
                 <MudTd DataLabel="Population">@context.Population.ToString("N0")</MudTd>
                 <MudTd DataLabel="Requests">@context.Total.ToString("N0")</MudTd>
                 <MudTd DataLabel="Per 10k">@context.PerTenThousand.ToString("0.0")</MudTd>
