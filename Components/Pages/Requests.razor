@@ -1,0 +1,165 @@
+@page "/requests"
+@inject RequestQueryService Svc
+@inject NavigationManager Nav
+@inject TimeProvider Clock
+@inject IDbContextFactory<CivicOpsDb> DbFactory
+
+<PageTitle>Requests - CivicOps</PageTitle>
+
+<div class="d-flex flex-wrap align-end justify-space-between gap-3 mb-4">
+    <div>
+        <span class="eyebrow">Work queue</span>
+        <MudText Typo="Typo.h3" Class="page-title" Tag="@("h1")">Requests</MudText>
+        <MudText Color="Color.Secondary">Search, filter and sort every service request. Filtering, sorting and paging run on the server.</MudText>
+    </div>
+    <MudTooltip Text="Download all requests matching the current filters as CSV">
+        <MudButton Href="@ExportHref" download="civicops-requests.csv" Variant="Variant.Outlined" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Rounded.Download" data-enhance-nav="false" aria-label="Export filtered requests to CSV">Export CSV</MudButton>
+    </MudTooltip>
+</div>
+
+<div class="d-flex flex-wrap gap-2 mb-3" role="group" aria-label="Quick filters">
+    @foreach (var (qf, label, icon) in Quicks)
+    {
+        var on = _q.Quick == qf;
+        <MudChip T="string" Variant="@(on ? Variant.Filled : Variant.Outlined)" Color="@(on ? Color.Primary : Color.Default)"
+                 Icon="@icon" OnClick="() => SetQuick(qf)" aria-pressed="@(on ? "true" : "false")" Class="px-3">@label</MudChip>
+    }
+</div>
+
+<MudPaper Class="grid-shell requests-grid" Elevation="0">
+    <div class="pa-3">
+        <MudGrid Spacing="2">
+            <MudItem xs="12" md="4">
+                <MudTextField T="string" Value="_q.Search" ValueChanged="OnSearch" Label="Search" Placeholder="Number, title or address"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Rounded.Search"
+                              DebounceInterval="350" Clearable="true" AdornmentAriaLabel="Search" />
+            </MudItem>
+            <MudItem xs="6" md="2">
+                <MudSelect T="RequestStatus?" Value="_q.Status" ValueChanged="v => Apply(() => _q.Status = v)" Label="Status" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                    @foreach (var s in Enum.GetValues<RequestStatus>()) { <MudSelectItem T="RequestStatus?" Value="@s">@StatusRules.Label(s)</MudSelectItem> }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="6" md="2">
+                <MudSelect T="RequestPriority?" Value="_q.Priority" ValueChanged="v => Apply(() => _q.Priority = v)" Label="Priority" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                    @foreach (var p in Enum.GetValues<RequestPriority>()) { <MudSelectItem T="RequestPriority?" Value="@p">@p</MudSelectItem> }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="6" md="2">
+                <MudSelect T="int?" Value="_q.CategoryId" ValueChanged="v => Apply(() => _q.CategoryId = v)" Label="Category" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                    @foreach (var c in _cats) { <MudSelectItem T="int?" Value="@c.Id">@c.Name</MudSelectItem> }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="6" md="2">
+                <MudSelect T="int?" Value="_q.DistrictId" ValueChanged="v => Apply(() => _q.DistrictId = v)" Label="District" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                    @foreach (var d in _dists) { <MudSelectItem T="int?" Value="@d.Id">@d.Name</MudSelectItem> }
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+    </div>
+
+    <MudDataGrid T="RequestRow" @ref="_grid" ServerData="LoadAsync" Hover="true" Dense="true" Bordered="false" Elevation="0"
+                 SortMode="SortMode.Single" Filterable="false" Breakpoint="Breakpoint.Sm" RowClass="row-link" RowClick="OnRowClick"
+                 aria-label="Service requests">
+        <Columns>
+            <PropertyColumn Property="x => x.Number" Title="Number" Sortable="true" InitialDirection="SortDirection.None">
+
+                <CellTemplate><MudLink Href="@($"/requests/{context.Item.Id}")" Underline="Underline.Hover" aria-label="@($"Open request {context.Item.Number}")">@context.Item.Number</MudLink></CellTemplate>
+            </PropertyColumn>
+            <PropertyColumn Property="x => x.Title" Title="Title" Sortable="true">
+                <CellTemplate>@context.Item.Title<div class="cell-sub">@context.Item.Category &middot; @context.Item.District</div></CellTemplate>
+            </PropertyColumn>
+            <PropertyColumn Property="x => x.Priority" Title="Priority" Sortable="true" >
+
+                <CellTemplate><MudChip T="string" Size="Size.Small" Color="@UiHelpers.PriorityColor(context.Item.Priority)" Variant="Variant.Outlined">@context.Item.Priority</MudChip></CellTemplate>
+            </PropertyColumn>
+            <PropertyColumn Property="x => x.Status" Title="Status" Sortable="true" >
+
+                <CellTemplate><MudChip T="string" Size="Size.Small" Color="@UiHelpers.StatusColor(context.Item.Status)" Icon="@UiHelpers.StatusIcon(context.Item.Status)">@StatusRules.Label(context.Item.Status)</MudChip></CellTemplate>
+            </PropertyColumn>
+            <PropertyColumn Property="x => x.Assignee" Title="Assignee" Sortable="true">
+                <CellTemplate>@(context.Item.Assignee ?? "Unassigned")</CellTemplate>
+            </PropertyColumn>
+            <PropertyColumn Property="x => x.CreatedAt" Title="Created" Sortable="true" InitialDirection="SortDirection.Descending">
+
+                <CellTemplate>@context.Item.CreatedAt.ToString("MMM d")</CellTemplate>
+            </PropertyColumn>
+            <PropertyColumn Property="x => x.DueAt" Title="Due" Sortable="true" >
+
+                <CellTemplate>
+                    @if (context.Item.IsOverdue(_now))
+                    {
+                        <span class="overdue-text">@context.Item.DueAt.ToString("MMM d") (overdue)</span>
+                    }
+                    else { @context.Item.DueAt.ToString("MMM d") }
+                </CellTemplate>
+            </PropertyColumn>
+        </Columns>
+        <NoRecordsContent><MudText Class="pa-6" Color="Color.Secondary">No requests match these filters.</MudText></NoRecordsContent>
+        <PagerContent><MudDataGridPager T="RequestRow" PageSizeOptions="@(new[] { 10, 25, 50 })" /></PagerContent>
+    </MudDataGrid>
+</MudPaper>
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? Auth { get; set; }
+
+    private MudDataGrid<RequestRow> _grid = default!;
+    private readonly RequestQuery _q = new();
+    private List<Category> _cats = [];
+    private List<District> _dists = [];
+    private DateTime _now;
+
+    private static readonly (QuickFilter, string, string)[] Quicks =
+    [
+        (QuickFilter.All, "All", Icons.Material.Rounded.ViewList),
+        (QuickFilter.Open, "Open", Icons.Material.Rounded.FolderOpen),
+        (QuickFilter.Overdue, "Overdue", Icons.Material.Rounded.WarningAmber),
+        (QuickFilter.Unassigned, "Unassigned", Icons.Material.Rounded.PersonOff),
+        (QuickFilter.Mine, "Assigned to me", Icons.Material.Rounded.Person),
+        (QuickFilter.Urgent, "High priority", Icons.Material.Rounded.PriorityHigh),
+    ];
+
+    private string ExportHref => "/api/requests/export.csv?" + _q.ToQueryString();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _now = Clock.GetUtcNow().UtcDateTime;
+        await using var db = await DbFactory.CreateDbContextAsync();
+        _cats = await db.Categories.AsNoTracking().OrderBy(c => c.Name).ToListAsync();
+        _dists = await db.Districts.AsNoTracking().OrderBy(d => d.Name).ToListAsync();
+    }
+
+    private async Task<GridData<RequestRow>> LoadAsync(GridState<RequestRow> state, CancellationToken ct)
+    {
+        _q.Page = state.Page;
+        _q.PageSize = state.PageSize;
+        if (state.SortDefinitions.FirstOrDefault() is { } sd)
+        {
+            _q.Sort = sd.SortBy switch
+            {
+                "CreatedAt" => SortField.Created,
+                "DueAt" => SortField.Due,
+                var n when Enum.TryParse<SortField>(n, out var f) => f,
+                _ => SortField.Created
+            };
+            _q.Descending = sd.Descending;
+        }
+        _now = Clock.GetUtcNow().UtcDateTime;
+        var actor = Actor.From((await Auth!).User);
+        var r = await Svc.QueryAsync(_q, actor, ct);
+        return new GridData<RequestRow> { Items = r.Items, TotalItems = r.Total };
+    }
+
+    private Task OnSearch(string? v) => Apply(() => _q.Search = v);
+
+    private Task SetQuick(QuickFilter f) => Apply(() => _q.Quick = f);
+
+    private async Task Apply(Action change)
+    {
+        change();
+        _grid.NavigateTo(Page.First);
+        await _grid.ReloadServerData();
+    }
+
+    private void OnRowClick(DataGridRowClickEventArgs<RequestRow> e) => Nav.NavigateTo($"/requests/{e.Item!.Id}");
+}

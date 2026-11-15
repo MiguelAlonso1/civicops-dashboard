@@ -1,0 +1,230 @@
+@page "/requests/{Id:int}"
+@using System.ComponentModel.DataAnnotations
+@inject RequestCommandService Svc
+@inject ISnackbar Snackbar
+@inject TimeProvider Clock
+
+<PageTitle>@(_d is null ? "Request" : _d.Number) - CivicOps</PageTitle>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" aria-label="Loading request" />
+}
+else if (_d is null)
+{
+    <MudAlert Severity="Severity.Warning">Request not found.</MudAlert>
+    <MudButton Href="/requests" Class="mt-4" StartIcon="@Icons.Material.Rounded.ArrowBack">Back to requests</MudButton>
+}
+else
+{
+    var d = _d;
+    var now = Clock.GetUtcNow().UtcDateTime;
+    <MudBreadcrumbs Items="_crumbs" Class="px-0 pt-0" />
+    <div class="d-flex flex-wrap align-start justify-space-between gap-3 mb-4">
+        <div class="min-w-0">
+            <span class="eyebrow">@d.Number &middot; @d.Category</span>
+            <MudText Typo="Typo.h4" Class="page-title" Tag="@("h1")">@d.Title</MudText>
+            <div class="d-flex flex-wrap gap-2 mt-2">
+                <MudChip T="string" Size="Size.Small" Color="@UiHelpers.StatusColor(d.Status)" Icon="@UiHelpers.StatusIcon(d.Status)">@StatusRules.Label(d.Status)</MudChip>
+                <MudChip T="string" Size="Size.Small" Color="@UiHelpers.PriorityColor(d.Priority)" Variant="Variant.Outlined">@d.Priority priority</MudChip>
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="@(d.ResolvedAt is null && StatusRules.IsOpen(d.Status) && d.DueAt < now ? Color.Error : Color.Default)" Icon="@Icons.Material.Rounded.Schedule">@UiHelpers.SlaText(d.Status, d.DueAt, d.ResolvedAt, now)</MudChip>
+            </div>
+        </div>
+    </div>
+
+    <MudGrid Spacing="3">
+        <MudItem xs="12" md="7" lg="8">
+            <MudPaper Class="panel auto pa-4 pa-sm-5 mb-3" Elevation="0">
+                <MudText Typo="Typo.h6" Class="mb-2">Description</MudText>
+                <MudText>@d.Description</MudText>
+                <MudGrid Spacing="2" Class="mt-2">
+                    <MudItem xs="6" sm="4"><dl class="detail-grid"><dt>District</dt><dd>@d.District</dd></dl></MudItem>
+                    <MudItem xs="6" sm="4"><dl class="detail-grid"><dt>Address</dt><dd>@d.Address</dd></dl></MudItem>
+                    <MudItem xs="6" sm="4"><dl class="detail-grid"><dt>Requester</dt><dd>@d.RequesterName</dd></dl></MudItem>
+                    <MudItem xs="6" sm="4"><dl class="detail-grid"><dt>Department</dt><dd>@d.Department</dd></dl></MudItem>
+                    <MudItem xs="6" sm="4"><dl class="detail-grid"><dt>Created</dt><dd>@d.CreatedAt.ToString("MMM d, yyyy HH:mm") UTC</dd></dl></MudItem>
+                    <MudItem xs="6" sm="4"><dl class="detail-grid"><dt>SLA due</dt><dd>@d.DueAt.ToString("MMM d, yyyy HH:mm") UTC</dd></dl></MudItem>
+                </MudGrid>
+            </MudPaper>
+
+            <MudPaper Class="panel auto pa-4 pa-sm-5" Elevation="0">
+                <MudText Typo="Typo.h6" Class="mb-3">Activity timeline</MudText>
+                <MudTimeline TimelineAlign="TimelineAlign.Start" TimelinePosition="TimelinePosition.Start" Class="pa-0">
+                    @foreach (var e in d.Events)
+                    {
+                        <MudTimelineItem Color="@EventColor(e)" Size="Size.Small" Variant="Variant.Filled">
+                            <ItemOpposite>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">@e.At.ToString("MMM d, yyyy")<br />@e.At.ToString("HH:mm") UTC</MudText>
+                            </ItemOpposite>
+                            <ItemContent>
+                                <MudText Typo="Typo.subtitle2">@EventTitle(e)</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">by @e.Actor</MudText>
+                                @if (!string.IsNullOrWhiteSpace(e.Note) && e.Kind != EventKind.Assigned)
+                                {
+                                    <MudText Typo="Typo.body2" Class="timeline-note mt-1">@e.Note</MudText>
+                                }
+                            </ItemContent>
+                        </MudTimelineItem>
+                    }
+                </MudTimeline>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="5" lg="4">
+            <MudPaper Class="panel auto pa-4 pa-sm-5 mb-3" Elevation="0">
+                <MudText Typo="Typo.h6" Class="mb-1">Assignment</MudText>
+                <MudText Class="mb-3"><MudIcon Icon="@Icons.Material.Rounded.Person" Size="Size.Small" Class="mr-1" />@(d.Assignee ?? "Unassigned")</MudText>
+                @if (_me is { CanAssign: true } && StatusRules.IsOpen(d.Status))
+                {
+                    <MudSelect T="string" Value="_assignee" ValueChanged="OnAssign" Label="Assign to" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+                        @foreach (var a in _assignees) { <MudSelectItem T="string" Value="@a.Id">@a.Name</MudSelectItem> }
+                    </MudSelect>
+                }
+                else if (_me is not null)
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">@(_me.CanAssign ? "This request is no longer open." : "Only supervisors and admins can assign requests.")</MudText>
+                }
+            </MudPaper>
+
+            <MudPaper Class="panel auto pa-4 pa-sm-5" Elevation="0">
+                <MudText Typo="Typo.h6" Class="mb-3">Update status</MudText>
+                @if (_me is null || !_me.CanEdit)
+                {
+                    <MudAlert Severity="Severity.Info" Dense="true" Icon="@Icons.Material.Rounded.Visibility">Your role is read-only. Sign in as an Agent, Supervisor or Admin to make changes.</MudAlert>
+                }
+                else if (_me.Role == Roles.Agent && d.AssigneeId != _me.UserId)
+                {
+                    <MudAlert Severity="Severity.Info" Dense="true">Agents can only update requests assigned to them.</MudAlert>
+                }
+                else
+                {
+                    @if (StatusRules.AllowedNext(d.Status).Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">This request is @StatusRules.Label(d.Status) and cannot change status.</MudText>
+                    }
+                    else
+                    {
+                        <EditForm Model="_status" OnValidSubmit="SubmitStatus" FormName="status">
+                            <DataAnnotationsValidator />
+                            <MudSelect T="RequestStatus?" @bind-Value="_status.NewStatus" For="@(() => _status.NewStatus)" Label="New status" Variant="Variant.Outlined" Margin="Margin.Dense" Required="true">
+                                @foreach (var s in StatusRules.AllowedNext(d.Status)) { <MudSelectItem T="RequestStatus?" Value="@s">@StatusRules.Label(s)</MudSelectItem> }
+                            </MudSelect>
+                            <MudTextField T="string" @bind-Value="_status.Note" For="@(() => _status.Note)" Label="Note" Lines="3" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-2"
+                                          HelperText="@NoteHelp" Counter="@RequestCommandService.MaxNoteLength" MaxLength="@RequestCommandService.MaxNoteLength" />
+                            <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Class="mt-3" Disabled="_busy" StartIcon="@Icons.Material.Rounded.Check">Update status</MudButton>
+                        </EditForm>
+                    }
+                    <MudDivider Class="my-4" />
+                    <EditForm Model="_note" OnValidSubmit="SubmitNote" FormName="note">
+                        <DataAnnotationsValidator />
+                        <MudTextField T="string" @bind-Value="_note.Text" For="@(() => _note.Text)" Label="Add a note" Lines="2" Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="@RequestCommandService.MaxNoteLength" />
+                        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Outlined" Color="Color.Primary" Class="mt-3" Disabled="_busy" StartIcon="@Icons.Material.Rounded.NoteAdd">Add note</MudButton>
+                    </EditForm>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+    [CascadingParameter] private Task<AuthenticationState>? Auth { get; set; }
+
+    private RequestView? _d;
+    private Actor? _me;
+    private bool _loading = true, _busy;
+    private string? _assignee;
+    private IReadOnlyList<AssigneeOption> _assignees = [];
+    private readonly StatusUpdate _status = new();
+    private readonly NoteModel _note = new();
+    private readonly List<BreadcrumbItem> _crumbs = [new("Requests", "/requests"), new("Detail", null, true)];
+
+    private string NoteHelp => _status.NewStatus is { } s && _d is not null && StatusRules.RequiresNote(_d.Status, s)
+        ? "Required for this change." : "Optional.";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _me = Actor.From((await Auth!).User);
+        _assignees = await Svc.GetAssigneesAsync();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = _d is null;
+        _d = await Svc.GetAsync(Id);
+        _assignee = _d?.AssigneeId;
+        _status.NewStatus = null;
+        _status.Note = null;
+        _status.Current = _d?.Status;
+        _loading = false;
+    }
+
+    private async Task SubmitStatus()
+    {
+        _busy = true;
+        var r = await Svc.ChangeStatusAsync(_me, Id, _status.NewStatus!.Value, _status.Note);
+        Report(r, "Status updated.");
+        if (r.Ok) await LoadAsync();
+        _busy = false;
+    }
+
+    private async Task SubmitNote()
+    {
+        _busy = true;
+        var r = await Svc.AddNoteAsync(_me, Id, _note.Text);
+        Report(r, "Note added.");
+        if (r.Ok) { _note.Text = null; await LoadAsync(); }
+        _busy = false;
+    }
+
+    private async Task OnAssign(string? userId)
+    {
+        var r = await Svc.AssignAsync(_me, Id, userId);
+        Report(r, userId is null ? "Request unassigned." : "Request assigned.");
+        await LoadAsync();
+    }
+
+    private void Report(OpResult r, string ok) =>
+        Snackbar.Add(r.Ok ? ok : r.Message ?? "Something went wrong.", r.Ok ? Severity.Success : Severity.Error);
+
+    private static Color EventColor(RequestEvent e) => e.Kind switch
+    {
+        EventKind.Created => Color.Info,
+        EventKind.Assigned => Color.Secondary,
+        EventKind.Note => Color.Default,
+        _ => UiHelpers.StatusColor(e.ToStatus ?? RequestStatus.New)
+    };
+
+    private static string EventTitle(RequestEvent e) => e.Kind switch
+    {
+        EventKind.Created => "Request submitted",
+        EventKind.Assigned => e.Note ?? "Assignment changed",
+        EventKind.Note => "Note added",
+        _ => $"{StatusRules.Label(e.FromStatus ?? RequestStatus.New)} to {StatusRules.Label(e.ToStatus ?? RequestStatus.New)}"
+    };
+
+    private sealed class StatusUpdate : IValidatableObject
+    {
+        public RequestStatus? Current { get; set; }
+
+        [Required(ErrorMessage = "Choose the new status.")]
+        public RequestStatus? NewStatus { get; set; }
+
+        [MaxLength(RequestCommandService.MaxNoteLength, ErrorMessage = "Notes are limited to 1000 characters.")]
+        public string? Note { get; set; }
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext _)
+        {
+            if (Current is { } c && NewStatus is { } n && StatusRules.RequiresNote(c, n) && string.IsNullOrWhiteSpace(Note))
+                yield return new ValidationResult($"A note is required to move a request to {StatusRules.Label(n)}.", [nameof(Note)]);
+        }
+    }
+
+    private sealed class NoteModel
+    {
+        [Required(ErrorMessage = "Write a note first.")]
+        [MaxLength(RequestCommandService.MaxNoteLength, ErrorMessage = "Notes are limited to 1000 characters.")]
+        public string? Text { get; set; }
+    }
+}

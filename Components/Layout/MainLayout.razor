@@ -1,0 +1,125 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject NavigationManager Nav
+
+<MudThemeProvider @ref="_themeProvider" Theme="AppTheme.Theme" IsDarkMode="_isDark" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<a class="skip-link" href="#main">Skip to content</a>
+
+<MudLayout>
+    <MudAppBar Elevation="0" Fixed="true" Class="border-b app-bar">
+        <MudIconButton Icon="@Icons.Material.Rounded.Menu" Color="Color.Inherit" Edge="Edge.Start"
+                       OnClick="() => _drawerOpen = !_drawerOpen" aria-label="Toggle navigation menu" Class="d-md-none" />
+        <MudLink Href="/" Underline="Underline.None" Color="Color.Inherit" Class="d-flex align-center ml-1 ml-md-0" aria-label="CivicOps home">
+            <MudAvatar Color="Color.Primary" Variant="Variant.Filled" Size="Size.Medium" Class="mr-3" aria-hidden="true">
+                <MudIcon Icon="@Icons.Material.Rounded.AccountBalance" Size="Size.Small" />
+            </MudAvatar>
+            <MudText Typo="Typo.h6">CivicOps</MudText>
+        </MudLink>
+        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Secondary" Class="ml-3 d-none d-sm-inline-flex">Demo</MudChip>
+        <MudSpacer />
+        <AuthorizeView>
+            <Authorized>
+                <MudChip T="string" Size="Size.Small" Color="@UiHelpers.RoleColor(RoleOf(context.User))" Variant="Variant.Filled" Class="d-none d-sm-inline-flex mr-2">@RoleOf(context.User)</MudChip>
+            </Authorized>
+        </AuthorizeView>
+        <MudTooltip Text="@(_isDark ? "Switch to light theme" : "Switch to dark theme")">
+            <MudIconButton Icon="@(_isDark ? Icons.Material.Rounded.LightMode : Icons.Material.Rounded.DarkMode)"
+                           Color="Color.Inherit" Href="@ThemeHref" data-enhance-nav="false"
+                           aria-label="@(_isDark ? "Switch to light theme" : "Switch to dark theme")" />
+        </MudTooltip>
+        <AuthorizeView>
+            <Authorized>
+                <form method="post" action="/account/logout" class="d-inline-flex">
+                    <MudTooltip Text="Sign out">
+                        <MudIconButton Icon="@Icons.Material.Rounded.Logout" Color="Color.Inherit" ButtonType="ButtonType.Submit" aria-label="Sign out" />
+                    </MudTooltip>
+                </form>
+            </Authorized>
+        </AuthorizeView>
+    </MudAppBar>
+
+    <MudDrawer @bind-Open="_drawerOpen" Variant="DrawerVariant.Responsive" Breakpoint="Breakpoint.Md" ClipMode="DrawerClipMode.Always" Elevation="0" Class="app-drawer">
+        <MudNavMenu Class="pt-3" aria-label="Main navigation">
+            <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Rounded.Dashboard" OnClick="CloseDrawer">Overview</MudNavLink>
+            <MudNavLink Href="/requests" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Rounded.ListAlt" OnClick="CloseDrawer">Requests</MudNavLink>
+            <MudNavLink Href="/districts" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Rounded.LocationCity" OnClick="CloseDrawer">Districts</MudNavLink>
+            <AuthorizeView Roles="@Roles.Admin">
+                <MudNavLink Href="/admin" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Rounded.AdminPanelSettings" OnClick="CloseDrawer">Admin</MudNavLink>
+            </AuthorizeView>
+        </MudNavMenu>
+        <AuthorizeView>
+            <Authorized>
+                <div class="drawer-user">
+                    <MudAvatar Color="Color.Secondary" Size="Size.Medium" aria-hidden="true">@Initials(context.User.FindFirst(Actor.DisplayNameClaim)?.Value)</MudAvatar>
+                    <div class="min-w-0">
+                        <MudText Typo="Typo.subtitle2" Class="text-truncate">@context.User.FindFirst(Actor.DisplayNameClaim)?.Value</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@RoleOf(context.User)@(RoleOf(context.User) == Roles.Viewer ? " (read-only)" : "")</MudText>
+                    </div>
+                </div>
+            </Authorized>
+        </AuthorizeView>
+    </MudDrawer>
+
+    <MudMainContent id="main">
+        <div class="page-body">
+            @Body
+        </div>
+        <footer class="app-footer">
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                CivicOps <span class="opacity-70">v@(AppInfo.Version)</span> &middot; Demo with synthetic data &middot; Not affiliated with any government agency
+            </MudText>
+            <MudText Typo="Typo.caption" Color="Color.Secondary">A portfolio project by Miguel Alonso &middot; Blazor, MudBlazor, EF Core</MudText>
+        </footer>
+    </MudMainContent>
+</MudLayout>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">&#x1F5D9;</span>
+</div>
+
+@code {
+    [CascadingParameter(Name = "ThemeMode")] private string? ThemeMode { get; set; }
+
+    private MudThemeProvider _themeProvider = default!;
+    private bool _isDark = true;
+    private bool _drawerOpen = true;
+
+    private string ThemeHref =>
+        $"/theme/{(_isDark ? "light" : "dark")}?returnUrl={Uri.EscapeDataString("/" + Nav.ToBaseRelativePath(Nav.Uri))}";
+
+    private static string RoleOf(System.Security.Claims.ClaimsPrincipal u) => Actor.From(u)?.Role ?? "";
+
+    private static string Initials(string? name) =>
+        string.Concat((name ?? "?").Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(p => char.ToUpperInvariant(p[0])));
+
+    private void CloseDrawer() => _drawerOpen = false;
+
+    protected override void OnInitialized()
+    {
+        if (ThemeMode is "light" or "dark") _isDark = ThemeMode == "dark";
+        Nav.LocationChanged += OnLocationChanged;
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e) => InvokeAsync(StateHasChanged);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || ThemeMode is "light" or "dark") return;
+        // No explicit choice: follow the system preference, live.
+        _isDark = await _themeProvider.GetSystemDarkModeAsync();
+        await _themeProvider.WatchSystemDarkModeAsync(async dark =>
+        {
+            _isDark = dark;
+            await InvokeAsync(StateHasChanged);
+        });
+        StateHasChanged();
+    }
+
+    public void Dispose() => Nav.LocationChanged -= OnLocationChanged;
+}

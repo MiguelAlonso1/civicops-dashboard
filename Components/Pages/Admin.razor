@@ -1,0 +1,133 @@
+@page "/admin"
+@attribute [Authorize(Roles = Roles.Admin)]
+@inject AdminService Svc
+@inject ISnackbar Snackbar
+@inject IDialogService Dialogs
+
+<PageTitle>Admin - CivicOps</PageTitle>
+
+<div class="mb-4">
+    <span class="eyebrow">Administration</span>
+    <MudText Typo="Typo.h3" Class="page-title" Tag="@("h1")">Categories and SLA rules</MudText>
+    <MudText Color="Color.Secondary">Target resolution time in hours for each category and priority. Changes apply to new requests.</MudText>
+</div>
+
+@if (_rows is null)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" aria-label="Loading categories" />
+}
+else
+{
+    <MudPaper Class="grid-shell mb-4" Elevation="0">
+        <MudTable Items="_rows" Dense="true" Breakpoint="Breakpoint.Md" Elevation="0" Hover="true" aria-label="Categories and SLA rules">
+            <HeaderContent>
+                <MudTh>Category</MudTh>
+                <MudTh>Department</MudTh>
+                @foreach (var p in Priorities) { <MudTh>@p (h)</MudTh> }
+                <MudTh>Active</MudTh>
+                <MudTh>Requests</MudTh>
+                <MudTh></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Category"><MudTextField T="string" @bind-Value="context.Name" Variant="Variant.Text" Margin="Margin.Dense" Style="min-width:170px" aria-label="@($"Name of {context.Name}")" /></MudTd>
+                <MudTd DataLabel="Department"><MudTextField T="string" @bind-Value="context.Department" Variant="Variant.Text" Margin="Margin.Dense" Style="min-width:190px" aria-label="@($"Department of {context.Name}")" /></MudTd>
+                @foreach (var p in Priorities)
+                {
+                    var pr = p;
+                    <MudTd DataLabel="@($"{pr} (h)")">
+                        <MudNumericField T="int" Value="context.Hours[pr]" ValueChanged="v => context.Hours[pr] = v" Min="AdminService.MinSlaHours" Max="AdminService.MaxSlaHours"
+                                         Variant="Variant.Outlined" Margin="Margin.Dense" HideSpinButtons="true" Style="min-width:80px;max-width:96px" aria-label="@($"{pr} SLA hours for {context.Name}")" />
+                    </MudTd>
+                }
+                <MudTd DataLabel="Active"><MudSwitch T="bool" @bind-Value="context.IsActive" Color="Color.Primary" aria-label="@($"{context.Name} active")" /></MudTd>
+                <MudTd DataLabel="Requests">@context.RequestCount</MudTd>
+                <MudTd>
+                    <MudTooltip Text="Save this category">
+                        <MudIconButton Icon="@Icons.Material.Rounded.Save" Color="Color.Primary" OnClick="() => SaveAsync(context)" aria-label="@($"Save {context.Name}")" />
+                    </MudTooltip>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudPaper>
+
+    <MudPaper Class="panel pa-4 pa-sm-5 mb-6" Elevation="0">
+        <MudText Typo="Typo.h6" Class="mb-3">Add category</MudText>
+        <MudGrid Spacing="2">
+            <MudItem xs="12" sm="6" md="3"><MudTextField T="string" @bind-Value="_new.Name" Label="Name" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+            <MudItem xs="12" sm="6" md="3"><MudTextField T="string" @bind-Value="_new.Department" Label="Department" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+            @foreach (var p in Priorities)
+            {
+                var pr = p;
+                <MudItem xs="6" sm="3" md="1"><MudNumericField T="int" Value="_new.Hours[pr]" ValueChanged="v => _new.Hours[pr] = v" Label="@($"{pr} h")" Variant="Variant.Outlined" Margin="Margin.Dense" HideSpinButtons="true" /></MudItem>
+            }
+            <MudItem xs="12" md="2"><MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" OnClick="() => SaveAsync(_new)" StartIcon="@Icons.Material.Rounded.Add">Add</MudButton></MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <MudPaper Class="panel pa-4 pa-sm-5" Elevation="0" Style="border-color: var(--mud-palette-warning)">
+        <div class="d-flex flex-wrap align-center justify-space-between gap-3">
+            <div>
+                <MudText Typo="Typo.h6">Reset demo data</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Deletes every request, category and SLA rule and regenerates about 500 synthetic requests over the last 12 months. Demo accounts are restored.</MudText>
+            </div>
+            <MudButton Variant="Variant.Outlined" Color="Color.Warning" StartIcon="@Icons.Material.Rounded.RestartAlt" OnClick="ResetAsync" Disabled="_resetting">Reset demo data</MudButton>
+        </div>
+    </MudPaper>
+}
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? Auth { get; set; }
+
+    private static readonly RequestPriority[] Priorities = Enum.GetValues<RequestPriority>();
+    private List<Row>? _rows;
+    private Row _new = Row.Blank();
+    private bool _resetting;
+
+    private sealed class Row
+    {
+        public int? Id { get; init; }
+        public string Name { get; set; } = "";
+        public string Department { get; set; } = "";
+        public bool IsActive { get; set; } = true;
+        public int RequestCount { get; init; }
+        public Dictionary<RequestPriority, int> Hours { get; init; } = [];
+
+        public static Row Blank() => new() { Hours = Priorities.ToDictionary(p => p, p => p switch { RequestPriority.Low => 240, RequestPriority.Normal => 120, RequestPriority.High => 48, _ => 24 }) };
+    }
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _rows = (await Svc.GetCategoriesAsync()).Select(c => new Row
+        {
+            Id = c.Id, Name = c.Name, Department = c.Department, IsActive = c.IsActive, RequestCount = c.RequestCount,
+            Hours = Priorities.ToDictionary(p => p, p => c.SlaHours.GetValueOrDefault(p))
+        }).ToList();
+    }
+
+    private async Task SaveAsync(Row r)
+    {
+        var actor = Actor.From((await Auth!).User);
+        var res = await Svc.SaveCategoryAsync(actor, r.Id, r.Name, r.Department, r.IsActive, r.Hours);
+        Snackbar.Add(res.Ok ? $"Saved {r.Name}." : res.Message ?? "Could not save.", res.Ok ? Severity.Success : Severity.Error);
+        if (res.Ok)
+        {
+            if (r.Id is null) _new = Row.Blank();
+            await LoadAsync();
+        }
+    }
+
+    private async Task ResetAsync()
+    {
+        var ok = await Dialogs.ShowMessageBoxAsync("Reset demo data?",
+            "All requests, categories and SLA rules will be deleted and regenerated. This cannot be undone.",
+            yesText: "Reset", cancelText: "Cancel");
+        if (ok != true) return;
+        _resetting = true;
+        var res = await Svc.ResetDemoDataAsync(Actor.From((await Auth!).User));
+        Snackbar.Add(res.Ok ? "Demo data was reset." : res.Message ?? "Reset failed.", res.Ok ? Severity.Success : Severity.Error);
+        await LoadAsync();
+        _resetting = false;
+    }
+}

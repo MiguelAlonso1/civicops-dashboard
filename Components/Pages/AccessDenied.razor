@@ -1,0 +1,12 @@
+@page "/access-denied"
+@layout PublicLayout
+@attribute [ExcludeFromInteractiveRouting]
+@attribute [AllowAnonymous]
+
+<PageTitle>Access denied - CivicOps</PageTitle>
+<MudContainer MaxWidth="MaxWidth.Small" Class="text-center">
+    <MudIcon Icon="@Icons.Material.Rounded.Lock" Size="Size.Large" Color="Color.Warning" Class="mb-3" />
+    <MudText Typo="Typo.h4" Class="mb-3">Access denied</MudText>
+    <MudText Color="Color.Secondary" Class="mb-6">Your role does not have permission to open this page.</MudText>
+    <MudButton Href="/" Variant="Variant.Filled" Color="Color.Primary">Back to overview</MudButton>
+</MudContainer>

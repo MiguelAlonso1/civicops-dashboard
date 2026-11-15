@@ -1,0 +1,29 @@
+@inherits LayoutComponentBase
+
+<MudThemeProvider Theme="AppTheme.Theme" IsDarkMode="@(ThemeMode != "light")" />
+<MudPopoverProvider />
+
+<a class="skip-link" href="#main">Skip to content</a>
+
+<main id="main" class="public-shell">
+    <div class="public-glow" aria-hidden="true"></div>
+    <div class="public-inner">
+        @Body
+    </div>
+    <footer class="public-footer">
+        <MudText Typo="Typo.caption" Color="Color.Secondary">CivicOps v@(AppInfo.Version) &middot; Demo with synthetic data &middot; Not affiliated with any government</MudText>
+        <div class="d-flex align-center mt-1">
+            <MudIconButton Icon="@(ThemeMode == "light" ? Icons.Material.Rounded.DarkMode : Icons.Material.Rounded.LightMode)"
+                           Href="@ThemeHref" data-enhance-nav="false" Color="Color.Inherit" Size="Size.Small"
+                           aria-label="@(ThemeMode == "light" ? "Switch to dark theme" : "Switch to light theme")" />
+        </div>
+    </footer>
+</main>
+
+@code {
+    [Inject] private NavigationManager Nav { get; set; } = default!;
+    [CascadingParameter(Name = "ThemeMode")] private string? ThemeMode { get; set; }
+
+    private string ThemeHref =>
+        $"/theme/{(ThemeMode == "light" ? "dark" : "light")}?returnUrl={Uri.EscapeDataString("/" + Nav.ToBaseRelativePath(Nav.Uri))}";
+}

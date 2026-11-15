@@ -1,0 +1,62 @@
+@page "/districts"
+@inject DashboardService Dash
+
+<PageTitle>Districts - CivicOps</PageTitle>
+
+<div class="mb-4">
+    <span class="eyebrow">Geography</span>
+    <MudText Typo="Typo.h3" Class="page-title" Tag="@("h1")">Districts</MudText>
+    <MudText Color="Color.Secondary">Workload and SLA performance by district. Rates are requests per 10,000 residents (synthetic population).</MudText>
+</div>
+
+@if (_rows is null)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" aria-label="Loading districts" />
+}
+else
+{
+    <MudPaper Class="grid-shell" Elevation="0">
+        <MudTable Items="_rows" Hover="true" Dense="false" Breakpoint="Breakpoint.Sm" Elevation="0" Bordered="false" aria-label="District breakdown">
+            <HeaderContent>
+                <MudTh><MudTableSortLabel SortBy="new Func<DistrictRow, object>(x => x.Name)" InitialDirection="SortDirection.Ascending">District</MudTableSortLabel></MudTh>
+                <MudTh><MudTableSortLabel SortBy="new Func<DistrictRow, object>(x => x.Population)">Population</MudTableSortLabel></MudTh>
+                <MudTh><MudTableSortLabel SortBy="new Func<DistrictRow, object>(x => x.Total)">Requests</MudTableSortLabel></MudTh>
+                <MudTh><MudTableSortLabel SortBy="new Func<DistrictRow, object>(x => x.PerTenThousand)">Per 10k</MudTableSortLabel></MudTh>
+                <MudTh><MudTableSortLabel SortBy="new Func<DistrictRow, object>(x => x.Open)">Open</MudTableSortLabel></MudTh>
+                <MudTh><MudTableSortLabel SortBy="new Func<DistrictRow, object>(x => x.Overdue)">Overdue</MudTableSortLabel></MudTh>
+                <MudTh><MudTableSortLabel SortBy="new Func<DistrictRow, object>(x => x.AvgResolutionHours)">Avg. resolution</MudTableSortLabel></MudTh>
+                <MudTh><MudTableSortLabel SortBy="new Func<DistrictRow, object>(x => x.SlaCompliancePct)">SLA compliance</MudTableSortLabel></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="District"><strong>@context.Code</strong> &middot; @context.Name</MudTd>
+                <MudTd DataLabel="Population">@context.Population.ToString("N0")</MudTd>
+                <MudTd DataLabel="Requests">@context.Total.ToString("N0")</MudTd>
+                <MudTd DataLabel="Per 10k">@context.PerTenThousand.ToString("0.0")</MudTd>
+                <MudTd DataLabel="Open">@context.Open</MudTd>
+                <MudTd DataLabel="Overdue"><span class="@(context.Overdue > 0 ? "overdue-text" : null)">@context.Overdue</span></MudTd>
+                <MudTd DataLabel="Avg. resolution">@UiHelpers.Hours(context.AvgResolutionHours)</MudTd>
+                <MudTd DataLabel="SLA compliance">
+                    <div class="d-flex align-center gap-2" style="min-width:150px">
+                        <MudProgressLinear Value="@context.SlaCompliancePct" Color="@(context.SlaCompliancePct >= 85 ? Color.Success : context.SlaCompliancePct >= 70 ? Color.Warning : Color.Error)"
+                                           Rounded="true" Size="Size.Medium" aria-label="@($"SLA compliance {context.SlaCompliancePct:0}% for {context.Name}")" Style="flex:1" />
+                        <span style="width:46px;text-align:right">@context.SlaCompliancePct.ToString("0")%</span>
+                    </div>
+                </MudTd>
+            </RowTemplate>
+            <FooterContent>
+                <MudTd colspan="2"><strong>All districts</strong></MudTd>
+                <MudTd><strong>@_rows.Sum(r => r.Total).ToString("N0")</strong></MudTd>
+                <MudTd></MudTd>
+                <MudTd><strong>@_rows.Sum(r => r.Open)</strong></MudTd>
+                <MudTd><strong>@_rows.Sum(r => r.Overdue)</strong></MudTd>
+                <MudTd colspan="2"></MudTd>
+            </FooterContent>
+        </MudTable>
+    </MudPaper>
+}
+
+@code {
+    private IReadOnlyList<DistrictRow>? _rows;
+
+    protected override async Task OnInitializedAsync() => _rows = (await Dash.GetAsync()).Districts;
+}

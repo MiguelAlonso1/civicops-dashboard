@@ -1,0 +1,21 @@
+<CascadingValue Value="ThemeMode" Name="ThemeMode">
+    <Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
+        <Found Context="routeData">
+            <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
+                <NotAuthorized>
+                    <MudContainer MaxWidth="MaxWidth.Small" Class="py-16 text-center">
+                        <MudText Typo="Typo.h4" GutterBottom="true">Access denied</MudText>
+                        <MudText Color="Color.Secondary" Class="mb-6">Your role does not have access to this page.</MudText>
+                        <MudButton Href="/" Variant="Variant.Filled" Color="Color.Primary">Back to overview</MudButton>
+                    </MudContainer>
+                </NotAuthorized>
+            </AuthorizeRouteView>
+            <FocusOnNavigate RouteData="routeData" Selector="h1" />
+        </Found>
+    </Router>
+</CascadingValue>
+
+@code {
+    /// <summary>"light", "dark" or null (no explicit choice yet). Read from the theme cookie in App.razor.</summary>
+    [Parameter] public string? ThemeMode { get; set; }
+}

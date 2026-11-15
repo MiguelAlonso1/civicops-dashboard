@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en" style="@HtmlStyle">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="CivicOps: a demo service-request and permit operations dashboard built with Blazor, MudBlazor and EF Core. Synthetic data." />
+    <meta name="theme-color" content="#0B1120" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>CivicOps</title>
+    <BasePath />
+    <ResourcePreloader />
+    <link rel="stylesheet" href="@Assets["fonts/fonts.css"]" />
+    <link href="@Assets["_content/MudBlazor/MudBlazor.min.css"]" rel="stylesheet" />
+    <link rel="stylesheet" href="@Assets["app.css"]" />
+    <ImportMap />
+    <link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48" />
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon.png" />
+    <HeadOutlet @rendermode="PageRenderMode" />
+</head>
+
+<body>
+    <Routes @rendermode="PageRenderMode" ThemeMode="@ThemeMode" />
+    <ReconnectModal />
+    <script src="@Assets["_framework/blazor.web.js"]"></script>
+    <script src="@Assets["_content/MudBlazor/MudBlazor.min.js"]"></script>
+</body>
+
+</html>
+
+@code {
+    [CascadingParameter] private HttpContext? HttpContext { get; set; }
+
+    // Pages marked [ExcludeFromInteractiveRouting] (login, access denied, errors) render statically: they must work
+    // before sign-in because the SignalR hub itself requires an authenticated user.
+    private IComponentRenderMode? PageRenderMode => HttpContext is not null && HttpContext.AcceptsInteractiveRouting() ? InteractiveServer : null;
+
+    // Explicit user choice from the theme cookie (null = follow system preference).
+    private string? ThemeMode
+    {
+        get
+        {
+            var v = HttpContext?.Request.Cookies[AppTheme.CookieName];
+            return v is "light" or "dark" ? v : null;
+        }
+    }
+
+    // Paint the correct background/color-scheme before CSS loads (no flash, no JS).
+    private string HtmlStyle => ThemeMode == "light"
+        ? "color-scheme:light;background-color:#F8FAFC"
+        : "color-scheme:dark;background-color:#0B1120";
+}

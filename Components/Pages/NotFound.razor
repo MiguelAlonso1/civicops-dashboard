@@ -1,0 +1,12 @@
+@page "/not-found"
+@layout PublicLayout
+@attribute [ExcludeFromInteractiveRouting]
+@attribute [AllowAnonymous]
+
+<PageTitle>Not found - CivicOps</PageTitle>
+<MudContainer MaxWidth="MaxWidth.Small" Class="text-center">
+    <MudText Typo="Typo.h1" Class="gradient-text mb-2">404</MudText>
+    <MudText Typo="Typo.h4" Class="mb-3">Page not found</MudText>
+    <MudText Color="Color.Secondary" Class="mb-6">The page you asked for does not exist or was moved.</MudText>
+    <MudButton Href="/" Variant="Variant.Filled" Color="Color.Primary">Back to overview</MudButton>
+</MudContainer>

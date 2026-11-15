@@ -1,0 +1,17 @@
+<MudPaper Class="kpi-tile" Elevation="0" Style="@($"--kpi-accent: var(--mud-palette-{Accent})")" role="group" aria-label="@Title">
+    <div class="d-flex align-center justify-space-between mb-3">
+        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">@Title</MudText>
+        <div class="kpi-icon" aria-hidden="true"><MudIcon Icon="@Icon" Size="Size.Small" /></div>
+    </div>
+    <MudText Typo="Typo.h3" Class="kpi-value">@Value</MudText>
+    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-2">@Caption</MudText>
+</MudPaper>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter, EditorRequired] public string Value { get; set; } = "";
+    [Parameter] public string Caption { get; set; } = "";
+    [Parameter, EditorRequired] public string Icon { get; set; } = "";
+    /// <summary>MudBlazor palette color name: primary, secondary, success, error, ...</summary>
+    [Parameter] public string Accent { get; set; } = "primary";
+}

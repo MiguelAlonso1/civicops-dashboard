@@ -1,0 +1,81 @@
+@page "/login"
+@layout PublicLayout
+@attribute [ExcludeFromInteractiveRouting]
+@attribute [AllowAnonymous]
+@inject IConfiguration Config
+
+<PageTitle>Sign in - CivicOps</PageTitle>
+
+<MudGrid Spacing="4" Justify="Justify.Center" Class="align-center">
+    <MudItem xs="12" md="6">
+        <div class="mb-3 d-flex align-center">
+            <MudAvatar Color="Color.Primary" Variant="Variant.Filled" Class="mr-3"><MudIcon Icon="@Icons.Material.Rounded.AccountBalance" /></MudAvatar>
+            <span class="eyebrow">Demo environment</span>
+        </div>
+        <MudText Typo="Typo.h2" Class="mb-3">Civic<span class="gradient-text">Ops</span></MudText>
+        <MudText Typo="Typo.h6" Color="Color.Secondary" Class="mb-4" Style="font-weight:500">
+            Service requests, permits and SLAs in one operations dashboard. Explore it with synthetic data, no sign-up needed.
+        </MudText>
+        <MudStack Spacing="1">
+            <MudText Typo="Typo.body2"><MudIcon Icon="@Icons.Material.Rounded.CheckCircle" Size="Size.Small" Color="Color.Success" Class="mr-2" />Live KPIs, SLA compliance and trend charts</MudText>
+            <MudText Typo="Typo.body2"><MudIcon Icon="@Icons.Material.Rounded.CheckCircle" Size="Size.Small" Color="Color.Success" Class="mr-2" />Server-side filtering, sorting, paging and CSV export</MudText>
+            <MudText Typo="Typo.body2"><MudIcon Icon="@Icons.Material.Rounded.CheckCircle" Size="Size.Small" Color="Color.Success" Class="mr-2" />Role-based access: Admin, Supervisor, Agent, Viewer</MudText>
+        </MudStack>
+    </MudItem>
+
+    <MudItem xs="12" md="6">
+        <MudPaper Class="login-card pa-5 pa-sm-6" Elevation="0">
+            <MudText Typo="Typo.h5" Class="mb-1">Try the demo</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">Pick a role to sign in with one click.</MudText>
+
+            @if (Config.GetValue("Demo:OneClickLogins", true))
+            {
+                <MudStack Spacing="2">
+                    @foreach (var (role, icon, blurb) in Roles4)
+                    {
+                        <form method="post" action="/account/demo" class="role-form">
+                            <AntiforgeryToken />
+                            <input type="hidden" name="role" value="@role" />
+                            <input type="hidden" name="returnUrl" value="@SafeReturn" />
+                            <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Outlined" Color="Color.Primary" Class="role-btn"
+                                       StartIcon="@icon" aria-label="@($"Sign in as the demo {role}")">
+                                <span class="d-flex flex-column align-start">
+                                    <span>@role</span>
+                                    <span class="mud-typography mud-typography-caption" style="text-transform:none;font-weight:400;opacity:.8">@blurb</span>
+                                </span>
+                            </MudButton>
+                        </form>
+                    }
+                </MudStack>
+                <MudDivider Class="my-5" />
+            }
+
+            <MudText Typo="Typo.subtitle1" Class="mb-3">Or sign in with email</MudText>
+            @if (Error == 1) { <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3">Invalid email or password.</MudAlert> }
+            @if (Error == 2) { <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">Too many attempts. Try again in a few minutes.</MudAlert> }
+            <form method="post" action="/account/login">
+                <AntiforgeryToken />
+                <input type="hidden" name="returnUrl" value="@SafeReturn" />
+                <label class="field"><span>Email</span><input type="email" name="email" autocomplete="username" required placeholder="viewer@civicops.demo" /></label>
+                <label class="field"><span>Password</span><input type="password" name="password" autocomplete="current-password" required /></label>
+                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" FullWidth="true">Sign in</MudButton>
+            </form>
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mt-3">All demo accounts use the password <code>@DemoDataSeeder.DemoPassword</code>. Data is synthetic and may be reset at any time.</MudText>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    [SupplyParameterFromQuery] private int? Error { get; set; }
+    [SupplyParameterFromQuery] private string? ReturnUrl { get; set; }
+
+    private string SafeReturn => Endpoints.AccountEndpoints.SafeReturnUrl(ReturnUrl);
+
+    private static readonly (string Role, string Icon, string Blurb)[] Roles4 =
+    [
+        (Roles.Admin, Icons.Material.Rounded.AdminPanelSettings, "Everything, plus categories, SLA rules and data reset"),
+        (Roles.Supervisor, Icons.Material.Rounded.SupervisorAccount, "Assign work and update any request"),
+        (Roles.Agent, Icons.Material.Rounded.Engineering, "Work your own queue and add notes"),
+        (Roles.Viewer, Icons.Material.Rounded.Visibility, "Read-only access to dashboards and requests"),
+    ];
+}

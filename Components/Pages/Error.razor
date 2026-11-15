@@ -1,0 +1,11 @@
+@page "/Error"
+@layout PublicLayout
+@attribute [ExcludeFromInteractiveRouting]
+@attribute [AllowAnonymous]
+
+<PageTitle>Error - CivicOps</PageTitle>
+<MudContainer MaxWidth="MaxWidth.Small" Class="text-center">
+    <MudText Typo="Typo.h4" Class="mb-3">Something went wrong</MudText>
+    <MudText Color="Color.Secondary" Class="mb-6">An unexpected error occurred. Please try again.</MudText>
+    <MudButton Href="/" Variant="Variant.Filled" Color="Color.Primary">Back to overview</MudButton>
+</MudContainer>

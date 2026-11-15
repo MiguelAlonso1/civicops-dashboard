@@ -1,0 +1,107 @@
+@page "/"
+@inject DashboardService Dash
+
+<PageTitle>Overview - CivicOps</PageTitle>
+
+<div class="mb-6">
+    <span class="eyebrow">Operations</span>
+    <MudText Typo="Typo.h3" Class="page-title" Tag="@("h1")">Overview</MudText>
+    <MudText Color="Color.Secondary">Service request volume, backlog and SLA performance over the last 12 months.</MudText>
+</div>
+
+@if (_data is null)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" aria-label="Loading dashboard" />
+}
+else
+{
+    var k = _data.Kpis;
+    <MudGrid Spacing="3">
+        <MudItem xs="12" sm="6" lg="3">
+            <Kpi Title="Open requests" Value="@k.Open.ToString("N0")" Caption="@($"{k.OpenedLast7Days} opened in the last 7 days")" Icon="@Icons.Material.Rounded.FolderOpen" Accent="primary" />
+        </MudItem>
+        <MudItem xs="12" sm="6" lg="3">
+            <Kpi Title="Overdue" Value="@k.Overdue.ToString("N0")" Caption="@($"{(k.Open == 0 ? 0 : 100.0 * k.Overdue / k.Open):0}% of open requests")" Icon="@Icons.Material.Rounded.WarningAmber" Accent="error" />
+        </MudItem>
+        <MudItem xs="12" sm="6" lg="3">
+            <Kpi Title="Avg. resolution time" Value="@UiHelpers.Hours(k.AvgResolutionHours)" Caption="@($"Resolved requests, last 90 days; {k.ResolvedLast7Days} resolved this week")" Icon="@Icons.Material.Rounded.Timer" Accent="secondary" />
+        </MudItem>
+        <MudItem xs="12" sm="6" lg="3">
+            <Kpi Title="SLA compliance" Value="@($"{k.SlaCompliancePct:0.0}%")" Caption="Requests created in the last 90 days" Icon="@Icons.Material.Rounded.VerifiedUser" Accent="success" />
+        </MudItem>
+
+        <MudItem xs="12" lg="8">
+            <MudPaper Class="panel pa-4 pa-sm-5" Elevation="0">
+                <MudText Typo="Typo.h6">Requests per week</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Created vs resolved, last 12 weeks</MudText>
+                <div class="chart-wrap">
+                    <MudChart T="double" ChartType="ChartType.Line" ChartSeries="_weekly" ChartLabels="_weekLabels" Width="100%" Height="330px"
+                              ChartOptions="_lineOptions" aria-label="Line chart of requests created and resolved per week" />
+                </div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" lg="4">
+            <MudPaper Class="panel pa-4 pa-sm-5" Elevation="0">
+                <MudText Typo="Typo.h6">By category</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Share of all requests</MudText>
+                <div class="d-flex justify-center my-3">
+                    <MudChart T="double" ChartType="ChartType.Donut" ChartSeries="_catSeries" ChartLabels="_catLabels" ChartOptions="_donutOptions" Width="240px" Height="240px"
+                              LegendPosition="Position.Bottom" aria-label="Donut chart of requests by category" />
+                </div>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" lg="6">
+            <MudPaper Class="panel pa-4 pa-sm-5" Elevation="0">
+                <MudText Typo="Typo.h6">By district</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Total requests, last 12 months</MudText>
+                <div class="chart-wrap">
+                    <MudChart T="double" ChartType="ChartType.Bar" ChartSeries="_distSeries" ChartLabels="_distLabels" Width="100%" Height="300px"
+                              ChartOptions="_barOptions" aria-label="Bar chart of requests by district" />
+                </div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" lg="6">
+            <MudPaper Class="panel pa-4 pa-sm-5" Elevation="0">
+                <MudText Typo="Typo.h6">SLA compliance trend</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Percent of requests meeting SLA, by month created</MudText>
+                <div class="chart-wrap">
+                    <MudChart T="double" ChartType="ChartType.Line" ChartSeries="_sla" ChartLabels="_slaLabels" Width="100%" Height="300px"
+                              ChartOptions="_lineOptions" aria-label="Line chart of monthly SLA compliance" />
+                </div>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private DashboardData? _data;
+    private List<ChartSeries<double>> _weekly = [];
+    private string[] _weekLabels = [];
+    private List<ChartSeries<double>> _catSeries = [];
+    private string[] _catLabels = [];
+    private List<ChartSeries<double>> _distSeries = [];
+    private string[] _distLabels = [];
+    private List<ChartSeries<double>> _sla = [];
+    private string[] _slaLabels = [];
+    private readonly ChartOptions _lineOptions = new() { ChartPalette = ["#6366F1", "#22D3EE"] };
+    private readonly ChartOptions _donutOptions = new() { ChartPalette = ["#6366F1", "#22D3EE", "#A78BFA", "#34D399", "#FBBF24", "#F87171", "#38BDF8", "#F472B6", "#94A3B8", "#FB923C"] };
+    private readonly ChartOptions _barOptions = new() { ChartPalette = ["#6366F1"] };
+
+    protected override async Task OnInitializedAsync()
+    {
+        var d = _data = await Dash.GetAsync();
+        _weekLabels = d.CreatedPerWeek.Select(x => x.Label).ToArray();
+        _weekly =
+        [
+            new() { Name = "Created", Data = d.CreatedPerWeek.Select(x => x.Value).ToArray() },
+            new() { Name = "Resolved", Data = d.ResolvedPerWeek.Select(x => x.Value).ToArray() },
+        ];
+        _catLabels = d.ByCategory.Select(c => c.Label).ToArray();
+        _catSeries = [new() { Name = "Requests", Data = d.ByCategory.Select(c => c.Value).ToArray() }];
+        _distLabels = d.ByDistrict.Select(x => x.Label).ToArray();
+        _distSeries = [new() { Name = "Requests", Data = d.ByDistrict.Select(x => x.Value).ToArray() }];
+        _slaLabels = d.SlaTrend.Select(x => x.Label).ToArray();
+        _sla = [new() { Name = "SLA %", Data = d.SlaTrend.Select(x => x.Value).ToArray() }];
+    }
+}
