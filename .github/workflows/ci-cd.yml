@@ -158,8 +158,7 @@ jobs:
           echo "GET $BASE/login: $code"; [ "$code" = "200" ] || { echo "::error::/login did not return 200"; exit 1; }
           # HTTP must redirect to HTTPS
           host="${BASE#https://}"; host="${host%%/*}"
-          read -r code loc < <(curl -s -o /dev/null -w '%{http_code} %{redirect_url}
-' --max-time 20 "http://$host/" || echo "000 ")
+          read -r code loc < <(curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' --max-time 20 "http://$host/" || echo "000 ")
           echo "http://$host/ -> $code $loc"
           case "$code:$loc" in
             301:https://*|308:https://*) ;;
