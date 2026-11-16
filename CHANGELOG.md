@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.0 - 2026-11-16 - Deployment to production slot
+
+- Deploys to the shared host's `PEM/` site folder (replacing the retired old app). Workflow gains a `clean_target` dispatch input that removes stale files (keeping App_Data, .well-known, logs) after the site is offline.
+- HTTP to HTTPS redirect is now opt-in (config `Https:Redirect=true`) so the site works over plain HTTP until a certificate exists; HSTS is only sent on HTTPS requests.
+- web.config: stdout logging to `.\logs`, `.db` downloads blocked, `App_Data` and `logs` hidden. Startup failures (unwritable storage, database creation) are logged clearly.
+- Smoke test is skipped with a notice when the `SITE_URL` variable is unset; HTTP-to-HTTPS check only runs if `SITE_URL` is https.
+
 ## 1.0.1 - 2026-11-15
 
 - Fix: "Reset demo data" failed with "database is locked" (Identity writes ran inside the seeding transaction) and surfaced as an unhandled circuit error; users are now restored before the transaction and failures show a snackbar.

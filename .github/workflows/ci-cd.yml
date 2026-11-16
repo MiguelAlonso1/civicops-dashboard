@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      clean_target:
+        description: 'Delete stale files in the target folder (mirror --delete; keeps App_Data, .well-known, logs). Only allowed for PEM/'
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -70,6 +75,10 @@ jobs:
               echo "::error::FTP_SERVER_DIR is unset or unsafe ('$RAW_DIR'). Refusing to deploy to the FTP account root. Set it to the site folder, e.g. ops.alonsomiguel.com/"
               exit 1;;
           esac
+          if [ "${{ github.event_name == 'workflow_dispatch' && inputs.clean_target }}" = "true" ] && [ "$DIR/" != "PEM/" ]; then
+            echo "::error::clean_target is only allowed when FTP_SERVER_DIR is exactly PEM/ (got '$DIR/')"
+            exit 1
+          fi
           echo "SERVER_DIR=$DIR/" >> "$GITHUB_ENV"
           echo "Deploying to folder: $DIR/"
 
@@ -116,7 +125,17 @@ jobs:
           echo '<html><body><h1>Updating, back in a minute.</h1></body></html>' > ./offline/app_offline.htm
           lftp_run "cd \"$SERVER_DIR\" && put -O . ./offline/app_offline.htm"
 
-      # Never uses --delete: server files we did not upload (.well-known, *.pfx, App_Data) are never removed.
+      # Optional one-time clean (workflow_dispatch clean_target=true): wait for the app to release its files, then mirror --delete.
+      # Never touches App_Data/, .well-known/, logs/, app_offline.htm. Hard-asserted to PEM/ only.
+      - name: Clean target folder (optional)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.clean_target }}
+        run: |
+          [ "$SERVER_DIR" = "PEM/" ] || { echo "::error::Refusing clean: SERVER_DIR is '$SERVER_DIR', must be PEM/"; exit 1; }
+          sleep 10
+          source "$HOME/lftp-run.sh"
+          lftp_run "mirror -R --delete --verbose --parallel=2 --no-perms --exclude-glob .well-known/ --exclude-glob App_Data/ --exclude-glob logs/ --exclude-glob app_offline.htm ./publish/ \"$SERVER_DIR\""
+
+      # Never uses --delete (except the optional clean step above): server files we did not upload (.well-known, *.pfx, App_Data) are never removed.
       # App_Data/ (SQLite database, data-protection keys) and any *.db file are excluded so live data is never overwritten.
       # Default `mirror -R` re-uploads every file whose size differs or whose local mtime is newer than the server's.
       # The artifact is freshly built, so local mtimes are always newer: changed files are always overwritten.
@@ -136,14 +155,25 @@ jobs:
             if lftp_run "cd \"$SERVER_DIR\" && rm -f app_offline.htm"; then ok=1; echo "app_offline.htm deleted"; break; fi
             echo "Delete attempt $i failed"; sleep 10
           done
-          rm -f "$HOME/lftp-run.sh"
           if [ -z "$ok" ]; then echo "::error::Could not delete app_offline.htm; site stays offline. Remove it manually (docs/DEPLOYMENT.md)"; exit 1; fi
+
+      - name: Directory listing after deploy
+        if: ${{ always() && steps.offline.outcome != 'skipped' }}
+        run: |
+          source "$HOME/lftp-run.sh"
+          echo "Listing of $SERVER_DIR:"
+          lftp_run "cls -1 \"$SERVER_DIR\"" || true
+          rm -f "$HOME/lftp-run.sh"
 
       - name: Smoke test
         env:
           SITE_URL: ${{ vars.SITE_URL }}
         run: |
-          URL="${SITE_URL:-https://ops.alonsomiguel.com/health}"
+          if [ -z "$SITE_URL" ]; then
+            echo "::notice::SITE_URL variable is unset (no hostname bound yet); skipping smoke test."
+            exit 0
+          fi
+          URL="$SITE_URL"
           BASE="${URL%/health}"
           ok=""
           for i in $(seq 1 12); do
@@ -153,14 +183,16 @@ jobs:
             sleep 10
           done
           if [ -z "$ok" ]; then echo "::error::Smoke test failed for $URL"; exit 1; fi
-          # The login page must render (public) and the app root must send anonymous users to it.
           code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$BASE/login" || echo 000)
           echo "GET $BASE/login: $code"; [ "$code" = "200" ] || { echo "::error::/login did not return 200"; exit 1; }
-          # HTTP must redirect to HTTPS
-          host="${BASE#https://}"; host="${host%%/*}"
-          read -r code loc < <(curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' --max-time 20 "http://$host/" || echo "000 ")
-          echo "http://$host/ -> $code $loc"
-          case "$code:$loc" in
-            301:https://*|308:https://*) ;;
-            *) echo "::error::http://$host/ does not redirect to https"; exit 1;;
+          case "$BASE" in
+            https://*)
+              host="${BASE#https://}"; host="${host%%/*}"
+              read -r code loc < <(curl -s -o /dev/null -w '%{http_code} %{redirect_url}
+' --max-time 20 "http://$host/" || echo "000 ")
+              echo "http://$host/ -> $code $loc"
+              case "$code:$loc" in
+                301:https://*|308:https://*) ;;
+                *) echo "::error::http://$host/ does not redirect to https"; exit 1;;
+              esac;;
           esac

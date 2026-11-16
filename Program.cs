@@ -13,7 +13,13 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Writable folder for the SQLite file and data-protection keys (App_Data is never overwritten by deployments).
 var storagePath = builder.Configuration["Storage:Path"] ?? Path.Combine(builder.Environment.ContentRootPath, "App_Data");
-Directory.CreateDirectory(storagePath);
+try { Directory.CreateDirectory(storagePath); }
+catch (Exception ex)
+{
+    // Shared hosts sometimes deny writes: make it obvious in stdout/logs before failing.
+    Console.Error.WriteLine($"FATAL: cannot create/write storage folder '{storagePath}': {ex}");
+    throw;
+}
 var connectionString = builder.Configuration.GetConnectionString("Default")
     ?? $"Data Source={Path.Combine(storagePath, "civicops.db")}";
 
@@ -82,22 +88,31 @@ builder.Services.AddHsts(o =>
 var app = builder.Build();
 
 // Create the schema and seed demo data on startup (EnsureCreated: the demo has no migrations, see README).
-using (var scope = app.Services.CreateScope())
+try
 {
+    using var scope = app.Services.CreateScope();
     var factory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<CivicOpsDb>>();
     await using (var db = await factory.CreateDbContextAsync())
         await db.Database.EnsureCreatedAsync();
     await scope.ServiceProvider.GetRequiredService<DemoDataSeeder>().SeedAsync();
+}
+catch (Exception ex)
+{
+    app.Logger.LogCritical(ex, "Startup failed creating/seeding the database at '{StoragePath}' (is the folder writable?)", storagePath);
+    Console.Error.WriteLine($"FATAL: database startup failed at '{storagePath}': {ex}");
+    throw;
 }
 
 app.UseForwardedHeaders();
 if (!app.Environment.IsDevelopment())
 {
     // HTTP -> HTTPS is done here (the IIS URL Rewrite rule is unreliable on shared hosting). ACME HTTP-01 stays on plain HTTP.
+    // Off by default until the host has a certificate for the site: set config Https:Redirect=true to enable.
+    var httpsRedirect = app.Configuration.GetValue<bool>("Https:Redirect");
     app.Use((ctx, next) =>
     {
         var req = ctx.Request;
-        if (!req.IsHttps && !req.Path.StartsWithSegments("/.well-known/acme-challenge", StringComparison.OrdinalIgnoreCase))
+        if (httpsRedirect && !req.IsHttps && !req.Path.StartsWithSegments("/.well-known/acme-challenge", StringComparison.OrdinalIgnoreCase))
         {
             ctx.Response.StatusCode = StatusCodes.Status301MovedPermanently;
             ctx.Response.Headers.Location = "https://" + req.Host + req.PathBase + req.Path + req.QueryString;
