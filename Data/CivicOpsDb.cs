@@ -10,6 +10,7 @@ public class CivicOpsDb(DbContextOptions<CivicOpsDb> options) : IdentityDbContex
     public DbSet<District> Districts => Set<District>();
     public DbSet<ServiceRequest> Requests => Set<ServiceRequest>();
     public DbSet<RequestEvent> Events => Set<RequestEvent>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -52,7 +53,18 @@ public class CivicOpsDb(DbContextOptions<CivicOpsDb> options) : IdentityDbContex
         {
             e.Property(x => x.Actor).HasMaxLength(100);
             e.Property(x => x.Note).HasMaxLength(1000);
+            e.Property(x => x.ActorId).HasMaxLength(450);
             e.HasOne(x => x.ServiceRequest).WithMany(r => r.Events).HasForeignKey(x => x.ServiceRequestId).OnDelete(DeleteBehavior.Cascade);
+        });
+        b.Entity<AuditLog>(e =>
+        {
+            e.Property(x => x.ActorId).HasMaxLength(450);
+            e.Property(x => x.ActorName).HasMaxLength(100);
+            e.Property(x => x.Action).HasMaxLength(60);
+            e.Property(x => x.EntityType).HasMaxLength(40);
+            e.Property(x => x.EntityKey).HasMaxLength(100);
+            e.Property(x => x.Details).HasMaxLength(1000);
+            e.HasIndex(x => x.At);
         });
     }
 }

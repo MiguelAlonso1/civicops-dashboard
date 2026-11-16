@@ -23,6 +23,22 @@ public sealed record Actor(string UserId, string Name, string Role)
     public bool CanEdit => Role is Roles.Admin or Roles.Supervisor or Roles.Agent;
     public bool CanAssign => Role is Roles.Admin or Roles.Supervisor;
     public bool CanAdminister => Role == Roles.Admin;
+
+    // CRUD permissions (enforced in the services, mirrored in the UI).
+    public bool CanCreateRequest => CanEdit;
+    public bool CanDeleteRequest => IsAdmin;
+    public bool CanManageUsers => IsAdmin;
+
+    /// <summary>Admins and supervisors edit any request; agents only their own assigned requests that are not closed or canceled.</summary>
+    public bool CanEditRequest(string? assigneeId, RequestStatus status) => Role switch
+    {
+        Roles.Admin or Roles.Supervisor => true,
+        Roles.Agent => assigneeId == UserId && status is not (RequestStatus.Closed or RequestStatus.Canceled),
+        _ => false
+    };
+
+    /// <summary>Authors edit or delete their own notes; admins any note.</summary>
+    public bool CanModifyNote(string? authorId) => CanEdit && (IsAdmin || (authorId is not null && authorId == UserId));
 }
 
 public enum Failure { None, Forbidden, NotFound, Invalid }
@@ -64,4 +80,15 @@ public static class StatusRules
         RequestStatus.OnHold => "On hold",
         _ => s.ToString()
     };
+}
+
+public static class Audit
+{
+    /// <summary>Adds an audit row to the context; the caller saves it in the same transaction as the change.</summary>
+    public static void Add(CivicOpsDb db, Actor actor, DateTime at, string action, string entityType, string entityKey, string? details = null) =>
+        db.AuditLogs.Add(new AuditLog
+        {
+            At = at, ActorId = actor.UserId, ActorName = actor.Name, Action = action, EntityType = entityType, EntityKey = entityKey,
+            Details = details is { Length: > 1000 } ? details[..1000] : details
+        });
 }

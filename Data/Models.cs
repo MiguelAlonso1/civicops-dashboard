@@ -6,7 +6,7 @@ public enum RequestStatus { New = 0, InProgress = 1, OnHold = 2, Resolved = 3, C
 
 public enum RequestPriority { Low = 0, Normal = 1, High = 2, Urgent = 3 }
 
-public enum EventKind { Created = 0, StatusChanged = 1, Assigned = 2, Note = 3 }
+public enum EventKind { Created = 0, StatusChanged = 1, Assigned = 2, Note = 3, Edited = 4 }
 
 public static class Roles
 {
@@ -84,5 +84,21 @@ public class RequestEvent
     public RequestStatus? FromStatus { get; set; }
     public RequestStatus? ToStatus { get; set; }
     public string Actor { get; set; } = "";
+    /// <summary>Identity user id of the author (null for seeded history). Lets authors edit or delete their own notes.</summary>
+    public string? ActorId { get; set; }
+    public DateTime? EditedAt { get; set; }
     public string? Note { get; set; }
+}
+
+/// <summary>Traceable record of destructive and administrative actions (hard deletes, user changes). Survives deleted entities.</summary>
+public class AuditLog
+{
+    public int Id { get; set; }
+    public DateTime At { get; set; }
+    public string ActorId { get; set; } = "";
+    public string ActorName { get; set; } = "";
+    public string Action { get; set; } = "";
+    public string EntityType { get; set; } = "";
+    public string EntityKey { get; set; } = "";
+    public string? Details { get; set; }
 }

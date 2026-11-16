@@ -1,0 +1,159 @@
+@page "/requests/new"
+@page "/requests/{Id:int}/edit"
+@inject RequestCommandService Svc
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+@inject TimeProvider Clock
+
+<PageTitle>@Heading - CivicOps</PageTitle>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" aria-label="Loading" />
+}
+else if (_denied is not null)
+{
+    <MudAlert Severity="Severity.Warning" Class="mb-4">@_denied</MudAlert>
+    <MudButton Href="@BackHref" StartIcon="@Icons.Material.Rounded.ArrowBack">Back</MudButton>
+}
+else
+{
+    <MudBreadcrumbs Items="_crumbs" Class="px-0 pt-0" />
+    <div class="mb-4">
+        <span class="eyebrow">@(IsNew ? "Intake" : _number)</span>
+        <MudText Typo="Typo.h4" Class="page-title" Tag="@("h1")">@Heading</MudText>
+        <MudText Color="Color.Secondary">The SLA due date is computed from the category and priority.</MudText>
+    </div>
+
+    <MudPaper Class="panel auto pa-4 pa-sm-5" Elevation="0">
+        <MudForm @ref="_form" @bind-IsValid="_valid" Model="_m">
+            <MudGrid Spacing="2">
+                <MudItem xs="12">
+                    <MudTextField T="string" @bind-Value="_m.Title" Label="Title" Variant="Variant.Outlined" Required="true" RequiredError="Title is required."
+                                  MaxLength="160" Counter="160" Immediate="true" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField T="string" @bind-Value="_m.Description" Label="Description" Variant="Variant.Outlined" Lines="4" Required="true" RequiredError="Description is required."
+                                  MaxLength="2000" Counter="2000" Immediate="true" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="int?" @bind-Value="_m.CategoryId" Label="Category" Variant="Variant.Outlined" Required="true" RequiredError="Choose a category.">
+                        @foreach (var c in (_lookups?.Categories ?? Array.Empty<CategoryOption>()).Where(c => c.IsActive || c.Id == _m.CategoryId))
+                        {
+                            <MudSelectItem T="int?" Value="@c.Id">@c.Name@(c.IsActive ? "" : " (inactive)")</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="int?" @bind-Value="_m.DistrictId" Label="District" Variant="Variant.Outlined" Required="true" RequiredError="Choose a district.">
+                        @foreach (var d in (_lookups?.Districts ?? Array.Empty<DistrictOption>())) { <MudSelectItem T="int?" Value="@d.Id">@d.Code &middot; @d.Name</MudSelectItem> }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="RequestPriority" @bind-Value="_m.Priority" Label="Priority" Variant="Variant.Outlined">
+                        @foreach (var p in Enum.GetValues<RequestPriority>()) { <MudSelectItem T="RequestPriority" Value="@p">@p</MudSelectItem> }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" Value="@DueText" Label="SLA due (UTC)" Variant="Variant.Outlined" ReadOnly="true" Disabled="true"
+                                  HelperText="@DueHelp" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" @bind-Value="_m.Address" Label="Address / location" Immediate="true" Variant="Variant.Outlined" Required="true" RequiredError="Address is required." MaxLength="160" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" @bind-Value="_m.RequesterName" Label="Requester name" Immediate="true" Variant="Variant.Outlined" Required="true" RequiredError="Requester name is required." MaxLength="100" />
+                </MudItem>
+            </MudGrid>
+            <div class="d-flex flex-wrap gap-2 mt-4">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync" Disabled="_busy" StartIcon="@Icons.Material.Rounded.Save">@(IsNew ? "Create request" : "Save changes")</MudButton>
+                <MudButton Variant="Variant.Text" Href="@BackHref">Cancel</MudButton>
+            </div>
+        </MudForm>
+    </MudPaper>
+}
+
+@code {
+    [Parameter] public int? Id { get; set; }
+    [CascadingParameter] private Task<AuthenticationState>? Auth { get; set; }
+
+    private sealed class Model
+    {
+        public string? Title { get; set; }
+        public string? Description { get; set; }
+        public int? CategoryId { get; set; }
+        public int? DistrictId { get; set; }
+        public RequestPriority Priority { get; set; } = RequestPriority.Normal;
+        public string? Address { get; set; }
+        public string? RequesterName { get; set; }
+    }
+
+    private MudForm _form = default!;
+    private bool _valid, _loading = true, _busy;
+    private string? _denied, _number;
+    private DateTime _createdAt;
+    private RequestLookups? _lookups;
+    private Actor? _me;
+    private readonly Model _m = new();
+    private List<BreadcrumbItem> _crumbs = [];
+
+    private bool IsNew => Id is null;
+    private string Heading => IsNew ? "New request" : "Edit request";
+    private string BackHref => IsNew ? "/requests" : $"/requests/{Id}";
+
+    private int? SlaHours => _m.CategoryId is { } c && _lookups?.Categories.FirstOrDefault(x => x.Id == c) is { } cat
+        && cat.SlaHours.TryGetValue(_m.Priority, out var h) ? h : null;
+    private string DueText => SlaHours is { } h ? (IsNew ? Clock.GetUtcNow().UtcDateTime : _createdAt).AddHours(h).ToString("MMM d, yyyy HH:mm") : "Pick a category";
+    private string DueHelp => SlaHours is { } h ? $"{h} h target from {(IsNew ? "submission" : "creation")}" : "";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _denied = null;
+        _me = Actor.From((await Auth!).User);
+        _crumbs = IsNew
+            ? [new("Requests", "/requests"), new("New", null, true)]
+            : [new("Requests", "/requests"), new("Detail", $"/requests/{Id}"), new("Edit", null, true)];
+        _lookups = await Svc.GetLookupsAsync();
+        if (IsNew)
+        {
+            if (_me is not { CanCreateRequest: true }) _denied = "Your role cannot create requests.";
+        }
+        else
+        {
+            var d = await Svc.GetAsync(Id!.Value);
+            if (d is null) _denied = "Request not found.";
+            else if (_me is null || !_me.CanEditRequest(d.AssigneeId, d.Status))
+                _denied = _me?.Role == Roles.Agent ? "Agents can only edit open requests assigned to them." : "Your role cannot edit requests.";
+            else
+            {
+                _number = d.Number;
+                _createdAt = d.CreatedAt;
+                _m.Title = d.Title; _m.Description = d.Description; _m.CategoryId = d.CategoryId;
+                _m.DistrictId = d.DistrictId; _m.Priority = d.Priority; _m.Address = d.Address; _m.RequesterName = d.RequesterName;
+            }
+        }
+        _loading = false;
+    }
+
+    private async Task SubmitAsync()
+    {
+        await _form.ValidateAsync();
+        if (!_valid) return;
+        _busy = true;
+        var input = new RequestInput(_m.Title, _m.Description, _m.CategoryId ?? 0, _m.DistrictId ?? 0, _m.Priority, _m.Address, _m.RequesterName);
+        if (IsNew)
+        {
+            var r = await Svc.CreateAsync(_me, input);
+            Snackbar.Add(r.Ok ? "Request created." : r.Result.Message ?? "Could not create the request.", r.Ok ? Severity.Success : Severity.Error);
+            if (r.Ok) Nav.NavigateTo($"/requests/{r.Id}");
+        }
+        else
+        {
+            var r = await Svc.EditAsync(_me, Id!.Value, input);
+            Snackbar.Add(r.Ok ? "Request updated." : r.Message ?? "Could not save the request.", r.Ok ? Severity.Success : Severity.Error);
+            if (r.Ok) Nav.NavigateTo($"/requests/{Id}");
+        }
+        _busy = false;
+    }
+}

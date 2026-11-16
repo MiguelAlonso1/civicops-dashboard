@@ -1,0 +1,30 @@
+@inject AdminService Svc
+
+<MudText Color="Color.Secondary" Class="mb-3">The 100 most recent deletions and user changes, newest first.</MudText>
+@if (_rows is null)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" aria-label="Loading audit log" />
+}
+else
+{
+    <MudPaper Class="grid-shell" Elevation="0">
+        <MudTable Items="_rows" Hover="true" Dense="true" Breakpoint="Breakpoint.Sm" Elevation="0" aria-label="Audit log">
+            <HeaderContent><MudTh>When (UTC)</MudTh><MudTh>Who</MudTh><MudTh>Action</MudTh><MudTh>Target</MudTh><MudTh>Details</MudTh></HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="When">@context.At.ToString("MMM d, yyyy HH:mm")</MudTd>
+                <MudTd DataLabel="Who">@context.Actor</MudTd>
+                <MudTd DataLabel="Action">@context.Action</MudTd>
+                <MudTd DataLabel="Target">@context.EntityType @context.EntityKey</MudTd>
+                <MudTd DataLabel="Details">@context.Details</MudTd>
+            </RowTemplate>
+            <NoRecordsContent><MudText Class="pa-4" Color="Color.Secondary">Nothing has been deleted or changed yet.</MudText></NoRecordsContent>
+        </MudTable>
+    </MudPaper>
+}
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? Auth { get; set; }
+    private IReadOnlyList<AuditRow>? _rows;
+
+    protected override async Task OnInitializedAsync() => _rows = await Svc.GetAuditAsync(Actor.From((await Auth!).User));
+}

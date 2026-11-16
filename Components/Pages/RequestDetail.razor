@@ -1,8 +1,11 @@
 @page "/requests/{Id:int}"
 @using System.ComponentModel.DataAnnotations
+@using CivicOps.Web.Components.Dialogs
 @inject RequestCommandService Svc
 @inject ISnackbar Snackbar
 @inject TimeProvider Clock
+@inject IDialogService Dialogs
+@inject NavigationManager Nav
 
 <PageTitle>@(_d is null ? "Request" : _d.Number) - CivicOps</PageTitle>
 
@@ -29,6 +32,16 @@ else
                 <MudChip T="string" Size="Size.Small" Color="@UiHelpers.PriorityColor(d.Priority)" Variant="Variant.Outlined">@d.Priority priority</MudChip>
                 <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="@(d.ResolvedAt is null && StatusRules.IsOpen(d.Status) && d.DueAt < now ? Color.Error : Color.Default)" Icon="@Icons.Material.Rounded.Schedule">@UiHelpers.SlaText(d.Status, d.DueAt, d.ResolvedAt, now)</MudChip>
             </div>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            @if (_me is not null && _me.CanEditRequest(d.AssigneeId, d.Status))
+            {
+                <MudButton Href="@($"/requests/{d.Id}/edit")" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.Edit">Edit</MudButton>
+            }
+            @if (_me is { CanDeleteRequest: true })
+            {
+                <MudButton OnClick="DeleteAsync" Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Rounded.Delete">Delete</MudButton>
+            }
         </div>
     </div>
 
@@ -58,10 +71,17 @@ else
                             </ItemOpposite>
                             <ItemContent>
                                 <MudText Typo="Typo.subtitle2">@EventTitle(e)</MudText>
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">by @e.Actor</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">by @e.Actor@(e.EditedAt is not null ? " (edited)" : "")</MudText>
                                 @if (!string.IsNullOrWhiteSpace(e.Note) && e.Kind != EventKind.Assigned)
                                 {
                                     <MudText Typo="Typo.body2" Class="timeline-note mt-1">@e.Note</MudText>
+                                }
+                                @if (e.Kind == EventKind.Note && _me is not null && _me.CanModifyNote(e.ActorId))
+                                {
+                                    <div class="d-flex gap-1 mt-1">
+                                        <MudIconButton Icon="@Icons.Material.Rounded.Edit" Size="Size.Small" OnClick="() => EditNoteAsync(e)" aria-label="Edit note" />
+                                        <MudIconButton Icon="@Icons.Material.Rounded.Delete" Size="Size.Small" Color="Color.Error" OnClick="() => DeleteNoteAsync(e)" aria-label="Delete note" />
+                                    </div>
                                 }
                             </ItemContent>
                         </MudTimelineItem>
@@ -185,12 +205,42 @@ else
         await LoadAsync();
     }
 
+    private async Task DeleteAsync()
+    {
+        var ok = await Dialogs.ShowMessageBoxAsync("Delete request?",
+            $"{_d!.Number} and its {_d.Events.Count} timeline events will be permanently deleted. An audit entry is kept. This cannot be undone.",
+            yesText: "Delete", cancelText: "Cancel");
+        if (ok != true) return;
+        var r = await Svc.DeleteAsync(_me, Id);
+        Report(r, $"{_d.Number} deleted.");
+        if (r.Ok) Nav.NavigateTo("/requests");
+    }
+
+    private async Task EditNoteAsync(RequestEvent e)
+    {
+        var dlg = await Dialogs.ShowAsync<EditNoteDialog>("Edit note", new DialogParameters<EditNoteDialog> { { x => x.Text, e.Note } },
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var res = await dlg.Result;
+        if (res is null || res.Canceled || res.Data is not string text) return;
+        Report(await Svc.EditNoteAsync(_me, e.Id, text), "Note updated.");
+        await LoadAsync();
+    }
+
+    private async Task DeleteNoteAsync(RequestEvent e)
+    {
+        var ok = await Dialogs.ShowMessageBoxAsync("Delete note?", "This note will be permanently deleted.", yesText: "Delete", cancelText: "Cancel");
+        if (ok != true) return;
+        Report(await Svc.DeleteNoteAsync(_me, e.Id), "Note deleted.");
+        await LoadAsync();
+    }
+
     private void Report(OpResult r, string ok) =>
         Snackbar.Add(r.Ok ? ok : r.Message ?? "Something went wrong.", r.Ok ? Severity.Success : Severity.Error);
 
     private static Color EventColor(RequestEvent e) => e.Kind switch
     {
         EventKind.Created => Color.Info,
+        EventKind.Edited => Color.Tertiary,
         EventKind.Assigned => Color.Secondary,
         EventKind.Note => Color.Default,
         _ => UiHelpers.StatusColor(e.ToStatus ?? RequestStatus.New)
@@ -201,6 +251,7 @@ else
         EventKind.Created => "Request submitted",
         EventKind.Assigned => e.Note ?? "Assignment changed",
         EventKind.Note => "Note added",
+        EventKind.Edited => "Request edited",
         _ => $"{StatusRules.Label(e.FromStatus ?? RequestStatus.New)} to {StatusRules.Label(e.ToStatus ?? RequestStatus.New)}"
     };
 

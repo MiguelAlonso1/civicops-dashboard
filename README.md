@@ -18,8 +18,9 @@ Built with .NET 11, Blazor (Interactive Server), MudBlazor, EF Core + SQLite and
 - **Overview**: KPI tiles (open, overdue, average resolution time, SLA compliance) and charts: requests per week (line), by category (donut), by district (bar), SLA compliance trend (line).
 - **Requests**: `MudDataGrid` with server-side paging, sorting and filtering (search, status, priority, category, district), quick filters (open, overdue, unassigned, assigned to me, high priority), status chips, and **CSV export** through a server endpoint (a plain download link, no JS). Exports neutralize spreadsheet formulas.
 - **Request detail**: `MudTimeline` of status changes, assignments and notes; assignment; validated status-update form that enforces the workflow (notes required for hold, resolve, cancel and reopen).
+- **Full CRUD with role-based permissions**: create and edit requests (SLA due date computed from category and priority), Admin-only delete with confirmation and an audit trail, edit/delete your own notes, categories (delete only when unused), districts and users (create, change role, lock/unlock, delete with self and last-Admin protection). All rules are enforced server-side in the services.
 - **Districts**: map-free breakdown table with workload per 10,000 residents, overdue counts, average resolution time and SLA compliance bars.
-- **Admin**: categories, departments and per-priority SLA hours; admin-only **Reset demo data** button.
+- **Admin**: tabs for categories and per-priority SLA hours, districts, users and the audit log; admin-only **Reset demo data** button.
 - **Auth**: ASP.NET Core Identity cookie sign-in, roles **Admin, Supervisor, Agent, Viewer**, and a "Try the demo" page with one-click logins using plain form posts. Viewer is read-only.
 - **Design**: dark-first navy + indigo/cyan theme shared with my personal site, light/dark toggle through a cookie (no JS), responsive and mobile-first, accessible (aria-labels, tooltips, skip link, 44px tap targets).
 
@@ -27,9 +28,9 @@ Built with .NET 11, Blazor (Interactive Server), MudBlazor, EF Core + SQLite and
 | Role | Can do |
 | --- | --- |
 | Viewer | Read dashboards, requests, districts, export CSV |
-| Agent | Viewer + add notes and update status on requests assigned to them |
-| Supervisor | Agent + assign requests and update any request |
-| Admin | Supervisor + edit categories/SLA rules and reset demo data |
+| Agent | Viewer + create requests (auto-assigned to them), add notes, update status and edit requests assigned to them (not closed/canceled), edit/delete their own notes |
+| Supervisor | Agent + create/edit/assign any request, update any status |
+| Admin | Supervisor + delete requests, manage categories/SLA rules, districts and users, view the audit log, reset demo data |
 
 Demo accounts: `admin@civicops.demo`, `supervisor@civicops.demo`, `agent@civicops.demo`, `viewer@civicops.demo`, all with password `Demo!2026pass` (public on purpose; synthetic demo).
 

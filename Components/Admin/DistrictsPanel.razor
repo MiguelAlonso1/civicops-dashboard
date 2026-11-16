@@ -1,0 +1,66 @@
+@using CivicOps.Web.Components.Dialogs
+@inject AdminService Svc
+@inject ISnackbar Snackbar
+@inject IDialogService Dialogs
+
+<div class="d-flex flex-wrap align-center justify-space-between gap-2 mb-3">
+    <MudText Color="Color.Secondary">Districts can only be deleted when no request references them.</MudText>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.Add" OnClick="() => EditAsync(null)">Add district</MudButton>
+</div>
+
+@if (_rows is null)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" aria-label="Loading districts" />
+}
+else
+{
+    <MudPaper Class="grid-shell" Elevation="0">
+        <MudTable Items="_rows" Hover="true" Breakpoint="Breakpoint.Sm" Elevation="0" aria-label="Districts">
+            <HeaderContent>
+                <MudTh>Code</MudTh><MudTh>Name</MudTh><MudTh>Population</MudTh><MudTh>Requests</MudTh><MudTh Style="text-align:right">Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Code"><strong>@context.Code</strong></MudTd>
+                <MudTd DataLabel="Name">@context.Name</MudTd>
+                <MudTd DataLabel="Population">@context.Population.ToString("N0")</MudTd>
+                <MudTd DataLabel="Requests">@context.RequestCount.ToString("N0")</MudTd>
+                <MudTd DataLabel="Actions" Style="text-align:right">
+                    <MudIconButton Icon="@Icons.Material.Rounded.Edit" Size="Size.Small" OnClick="() => EditAsync(context)" aria-label="@($"Edit {context.Name}")" />
+                    <MudIconButton Icon="@Icons.Material.Rounded.Delete" Size="Size.Small" Color="Color.Error" OnClick="() => DeleteAsync(context)" aria-label="@($"Delete {context.Name}")" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudPaper>
+}
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? Auth { get; set; }
+    private IReadOnlyList<DistrictAdminRow>? _rows;
+
+    protected override async Task OnInitializedAsync() => _rows = await Svc.GetDistrictsAsync();
+
+    private async Task EditAsync(DistrictAdminRow? d)
+    {
+        var p = new DialogParameters<DistrictDialog> { { x => x.Code, d?.Code }, { x => x.Name, d?.Name }, { x => x.Population, d?.Population ?? 50000 } };
+        var dlg = await Dialogs.ShowAsync<DistrictDialog>(d is null ? "Add district" : "Edit district", p, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var res = await dlg.Result;
+        if (res is null || res.Canceled || res.Data is not ValueTuple<string?, string?, int> v) return;
+        var r = await Svc.SaveDistrictAsync(Actor.From((await Auth!).User), d?.Id, v.Item1, v.Item2, v.Item3);
+        Snackbar.Add(r.Ok ? "District saved." : r.Message ?? "Could not save.", r.Ok ? Severity.Success : Severity.Error);
+        if (r.Ok) _rows = await Svc.GetDistrictsAsync();
+    }
+
+    private async Task DeleteAsync(DistrictAdminRow d)
+    {
+        if (d.RequestCount > 0)
+        {
+            Snackbar.Add($"{d.Name} is used by {d.RequestCount} requests and cannot be deleted.", Severity.Warning);
+            return;
+        }
+        var ok = await Dialogs.ShowMessageBoxAsync("Delete district?", $"{d.Name} will be permanently deleted.", yesText: "Delete", cancelText: "Cancel");
+        if (ok != true) return;
+        var r = await Svc.DeleteDistrictAsync(Actor.From((await Auth!).User), d.Id);
+        Snackbar.Add(r.Ok ? "District deleted." : r.Message ?? "Could not delete.", r.Ok ? Severity.Success : Severity.Warning);
+        if (r.Ok) _rows = await Svc.GetDistrictsAsync();
+    }
+}

@@ -3,6 +3,9 @@
 @inject NavigationManager Nav
 @inject TimeProvider Clock
 @inject IDbContextFactory<CivicOpsDb> DbFactory
+@inject RequestCommandService Cmd
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
 
 <PageTitle>Requests - CivicOps</PageTitle>
 
@@ -12,10 +15,16 @@
         <MudText Typo="Typo.h3" Class="page-title" Tag="@("h1")">Requests</MudText>
         <MudText Color="Color.Secondary">Search, filter and sort every service request. Filtering, sorting and paging run on the server.</MudText>
     </div>
+    <div class="d-flex flex-wrap gap-2">
+    @if (_me is { CanCreateRequest: true })
+    {
+        <MudButton Href="/requests/new" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.Add">New request</MudButton>
+    }
     <MudTooltip Text="Download all requests matching the current filters as CSV">
         <MudButton Href="@ExportHref" download="civicops-requests.csv" Variant="Variant.Outlined" Color="Color.Primary"
                    StartIcon="@Icons.Material.Rounded.Download" data-enhance-nav="false" aria-label="Export filtered requests to CSV">Export CSV</MudButton>
     </MudTooltip>
+    </div>
 </div>
 
 <div class="d-flex flex-wrap gap-2 mb-3" role="group" aria-label="Quick filters">
@@ -102,6 +111,20 @@
                     else { @context.Item.DueAt.ToString("MMM d") }
                 </CellTemplate>
             </PropertyColumn>
+            <TemplateColumn Title="Actions" Sortable="false" CellClass="actions-cell">
+                <CellTemplate>
+                    <div class="d-flex justify-end" @onclick:stopPropagation="true">
+                        @if (_me is not null && _me.CanEditRequest(context.Item.AssigneeId, context.Item.Status))
+                        {
+                            <MudTooltip Text="Edit"><MudIconButton Icon="@Icons.Material.Rounded.Edit" Size="Size.Small" Href="@($"/requests/{context.Item.Id}/edit")" aria-label="@($"Edit {context.Item.Number}")" /></MudTooltip>
+                        }
+                        @if (_me is { CanDeleteRequest: true })
+                        {
+                            <MudTooltip Text="Delete"><MudIconButton Icon="@Icons.Material.Rounded.Delete" Size="Size.Small" Color="Color.Error" OnClick="() => DeleteAsync(context.Item)" aria-label="@($"Delete {context.Item.Number}")" /></MudTooltip>
+                        }
+                    </div>
+                </CellTemplate>
+            </TemplateColumn>
         </Columns>
         <NoRecordsContent><MudText Class="pa-6" Color="Color.Secondary">No requests match these filters.</MudText></NoRecordsContent>
         <PagerContent><MudDataGridPager T="RequestRow" PageSizeOptions="@(new[] { 10, 25, 50 })" /></PagerContent>
@@ -116,6 +139,7 @@
     private List<Category> _cats = [];
     private List<District> _dists = [];
     private DateTime _now;
+    private Actor? _me;
 
     private static readonly (QuickFilter, string, string)[] Quicks =
     [
@@ -132,6 +156,7 @@
     protected override async Task OnInitializedAsync()
     {
         _now = Clock.GetUtcNow().UtcDateTime;
+        _me = Actor.From((await Auth!).User);
         await using var db = await DbFactory.CreateDbContextAsync();
         _cats = await db.Categories.AsNoTracking().OrderBy(c => c.Name).ToListAsync();
         _dists = await db.Districts.AsNoTracking().OrderBy(d => d.Name).ToListAsync();
@@ -156,6 +181,16 @@
         var actor = Actor.From((await Auth!).User);
         var r = await Svc.QueryAsync(_q, actor, ct);
         return new GridData<RequestRow> { Items = r.Items, TotalItems = r.Total };
+    }
+
+    private async Task DeleteAsync(RequestRow row)
+    {
+        var ok = await Dialogs.ShowMessageBoxAsync("Delete request?",
+            $"{row.Number} and its timeline will be permanently deleted. An audit entry is kept. This cannot be undone.", yesText: "Delete", cancelText: "Cancel");
+        if (ok != true) return;
+        var r = await Cmd.DeleteAsync(_me, row.Id);
+        Snackbar.Add(r.Ok ? $"{row.Number} deleted." : r.Message ?? "Could not delete.", r.Ok ? Severity.Success : Severity.Error);
+        if (r.Ok) await _grid.ReloadServerData();
     }
 
     private Task OnSearch(string? v) => Apply(() => _q.Search = v);

@@ -48,6 +48,7 @@ public static class AccountEndpoints
             if (role is null || !DemoDataSeeder.DemoLogins.TryGetValue(role, out var demo)) return Results.BadRequest();
             var user = await users.FindByEmailAsync(demo.Email);
             if (user is null) return Results.NotFound();
+            if (await users.IsLockedOutAsync(user)) return Results.LocalRedirect("/login?error=2");
             await signIn.SignInAsync(user, isPersistent: false);
             return Results.LocalRedirect(SafeReturnUrl(returnUrl));
         }).AllowAnonymous();

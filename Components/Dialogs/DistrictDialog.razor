@@ -1,0 +1,23 @@
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="2">
+            <MudTextField T="string" @bind-Value="Code" Label="Code" Variant="Variant.Outlined" MaxLength="8" Immediate="true" AutoFocus="true"
+                          Error="@(string.IsNullOrWhiteSpace(Code))" ErrorText="Code is required." />
+            <MudTextField T="string" @bind-Value="Name" Label="Name" Variant="Variant.Outlined" MaxLength="60" Immediate="true"
+                          Error="@(string.IsNullOrWhiteSpace(Name))" ErrorText="Name is required." />
+            <MudNumericField T="int" @bind-Value="Population" Label="Population (synthetic)" Variant="Variant.Outlined" Min="0" Max="10000000" HideSpinButtons="true" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => MudDialog.Cancel()">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@(string.IsNullOrWhiteSpace(Code) || string.IsNullOrWhiteSpace(Name))"
+                   OnClick="() => MudDialog.Close(DialogResult.Ok((Code, Name, Population)))">Save</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string? Code { get; set; }
+    [Parameter] public string? Name { get; set; }
+    [Parameter] public int Population { get; set; } = 50000;
+}

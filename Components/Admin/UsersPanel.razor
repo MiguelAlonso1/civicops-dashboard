@@ -1,0 +1,87 @@
+@using CivicOps.Web.Components.Dialogs
+@inject UserAdminService Svc
+@inject ISnackbar Snackbar
+@inject IDialogService Dialogs
+
+<div class="d-flex flex-wrap align-center justify-space-between gap-2 mb-3">
+    <MudText Color="Color.Secondary">Locking is a soft disable (the user keeps their history). You cannot delete or lock yourself, or remove the last Admin.</MudText>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Rounded.PersonAdd" OnClick="CreateAsync">Add user</MudButton>
+</div>
+
+@if (_rows is null)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" aria-label="Loading users" />
+}
+else
+{
+    <MudPaper Class="grid-shell" Elevation="0">
+        <MudTable Items="_rows" Hover="true" Breakpoint="Breakpoint.Sm" Elevation="0" aria-label="Users">
+            <HeaderContent><MudTh>User</MudTh><MudTh>Role</MudTh><MudTh>Status</MudTh><MudTh Style="text-align:right">Actions</MudTh></HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="User">
+                    <div>@context.DisplayName@(context.Id == _me?.UserId ? " (you)" : "")</div>
+                    <div class="cell-sub">@context.Email</div>
+                </MudTd>
+                <MudTd DataLabel="Role">
+                    <MudSelect T="string" Value="context.Role" ValueChanged="v => ChangeRoleAsync(context, v)" Variant="Variant.Outlined" Margin="Margin.Dense"
+                               Disabled="@(context.Id == _me?.UserId)" aria-label="@($"Role of {context.DisplayName}")" Style="min-width:140px">
+                        @foreach (var r in Roles.All) { <MudSelectItem T="string" Value="@r">@r</MudSelectItem> }
+                    </MudSelect>
+                </MudTd>
+                <MudTd DataLabel="Status">
+                    <MudChip T="string" Size="Size.Small" Color="@(context.IsLocked ? Color.Warning : Color.Success)" Icon="@(context.IsLocked ? Icons.Material.Rounded.Lock : Icons.Material.Rounded.CheckCircle)">@(context.IsLocked ? "Locked" : "Active")</MudChip>
+                </MudTd>
+                <MudTd DataLabel="Actions" Style="text-align:right">
+                    <MudTooltip Text="@(context.IsLocked ? "Unlock" : "Lock")">
+                        <MudIconButton Icon="@(context.IsLocked ? Icons.Material.Rounded.LockOpen : Icons.Material.Rounded.Lock)" Size="Size.Small" Disabled="@(context.Id == _me?.UserId)"
+                                       OnClick="() => ToggleLockAsync(context)" aria-label="@($"{(context.IsLocked ? "Unlock" : "Lock")} {context.DisplayName}")" />
+                    </MudTooltip>
+                    <MudTooltip Text="Delete">
+                        <MudIconButton Icon="@Icons.Material.Rounded.Delete" Size="Size.Small" Color="Color.Error" Disabled="@(context.Id == _me?.UserId)"
+                                       OnClick="() => DeleteAsync(context)" aria-label="@($"Delete {context.DisplayName}")" />
+                    </MudTooltip>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudPaper>
+}
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? Auth { get; set; }
+    private IReadOnlyList<UserRow>? _rows;
+    private Actor? _me;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _me = Actor.From((await Auth!).User);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync() => _rows = await Svc.ListAsync(_me);
+
+    private async Task Report(OpResult r, string ok)
+    {
+        Snackbar.Add(r.Ok ? ok : r.Message ?? "Something went wrong.", r.Ok ? Severity.Success : Severity.Warning);
+        await LoadAsync();
+    }
+
+    private async Task CreateAsync()
+    {
+        var dlg = await Dialogs.ShowAsync<UserDialog>("Add user", new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var res = await dlg.Result;
+        if (res is null || res.Canceled || res.Data is not ValueTuple<string?, string?, string?, string?> v) return;
+        await Report(await Svc.CreateAsync(_me, v.Item1, v.Item2, v.Item3, v.Item4), "User created.");
+    }
+
+    private async Task ChangeRoleAsync(UserRow u, string role) => await Report(await Svc.ChangeRoleAsync(_me, u.Id, role), $"{u.DisplayName} is now {role}.");
+
+    private async Task ToggleLockAsync(UserRow u) =>
+        await Report(await Svc.SetLockedAsync(_me, u.Id, !u.IsLocked), u.IsLocked ? $"{u.DisplayName} unlocked." : $"{u.DisplayName} locked.");
+
+    private async Task DeleteAsync(UserRow u)
+    {
+        var ok = await Dialogs.ShowMessageBoxAsync("Delete user?", $"{u.DisplayName} ({u.Email}) will be permanently deleted. Their assigned requests become unassigned.", yesText: "Delete", cancelText: "Cancel");
+        if (ok != true) return;
+        await Report(await Svc.DeleteAsync(_me, u.Id), "User deleted.");
+    }
+}

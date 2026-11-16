@@ -56,7 +56,7 @@ public sealed class RequestQuery
 
 public sealed record RequestRow(
     int Id, string Number, string Title, string Category, string District, RequestPriority Priority,
-    RequestStatus Status, string? Assignee, DateTime CreatedAt, DateTime DueAt, DateTime? ResolvedAt)
+    RequestStatus Status, string? Assignee, DateTime CreatedAt, DateTime DueAt, DateTime? ResolvedAt, string? AssigneeId = null)
 {
     public bool IsOverdue(DateTime now) => StatusRules.IsOpen(Status) && DueAt < now;
 }

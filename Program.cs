@@ -37,6 +37,7 @@ builder.Services.AddScoped<RequestQueryService>();
 builder.Services.AddScoped<RequestCommandService>();
 builder.Services.AddScoped<DashboardService>();
 builder.Services.AddScoped<AdminService>();
+builder.Services.AddScoped<UserAdminService>();
 
 builder.Services.AddDataProtection()
     .SetApplicationName("CivicOps")
@@ -92,8 +93,7 @@ try
 {
     using var scope = app.Services.CreateScope();
     var factory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<CivicOpsDb>>();
-    await using (var db = await factory.CreateDbContextAsync())
-        await db.Database.EnsureCreatedAsync();
+    await SchemaVersion.EnsureAsync(factory, app.Logger);
     await scope.ServiceProvider.GetRequiredService<DemoDataSeeder>().SeedAsync();
 }
 catch (Exception ex)

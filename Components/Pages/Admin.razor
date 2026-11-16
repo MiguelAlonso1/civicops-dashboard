@@ -1,5 +1,6 @@
 @page "/admin"
 @attribute [Authorize(Roles = Roles.Admin)]
+@using CivicOps.Web.Components.Admin
 @inject AdminService Svc
 @inject ISnackbar Snackbar
 @inject IDialogService Dialogs
@@ -8,61 +9,18 @@
 
 <div class="mb-4">
     <span class="eyebrow">Administration</span>
-    <MudText Typo="Typo.h3" Class="page-title" Tag="@("h1")">Categories and SLA rules</MudText>
-    <MudText Color="Color.Secondary">Target resolution time in hours for each category and priority. Changes apply to new requests.</MudText>
+    <MudText Typo="Typo.h3" Class="page-title" Tag="@("h1")">Admin</MudText>
+    <MudText Color="Color.Secondary">Manage categories and SLA rules, districts and users. Destructive actions are written to the audit log.</MudText>
 </div>
 
-@if (_rows is null)
-{
-    <MudProgressLinear Indeterminate="true" Color="Color.Primary" aria-label="Loading categories" />
-}
-else
-{
-    <div class="d-flex flex-column gap-3 mb-4" role="list" aria-label="Categories and SLA rules">
-        @foreach (var row in _rows)
-        {
-            var context = row;
-            <MudPaper Class="panel auto pa-4" Elevation="0" role="listitem">
-                <MudGrid Spacing="2" Class="align-center">
-                    <MudItem xs="12" sm="6" lg="4"><MudTextField T="string" @bind-Value="context.Name" Label="Category" Variant="Variant.Outlined" Margin="Margin.Dense" aria-label="@($"Name of {context.Name}")" /></MudItem>
-                    <MudItem xs="12" sm="6" lg="4"><MudTextField T="string" @bind-Value="context.Department" Label="Department" Variant="Variant.Outlined" Margin="Margin.Dense" aria-label="@($"Department of {context.Name}")" /></MudItem>
-                    <MudItem xs="12" lg="4">
-                        <div class="d-flex align-center justify-space-between gap-3">
-                            <MudSwitch T="bool" @bind-Value="context.IsActive" Color="Color.Primary" Label="Active" aria-label="@($"{context.Name} active")" />
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">@context.RequestCount requests</MudText>
-                            <MudTooltip Text="Save this category">
-                                <MudIconButton Icon="@Icons.Material.Rounded.Save" Color="Color.Primary" OnClick="() => SaveAsync(context)" aria-label="@($"Save {context.Name}")" />
-                            </MudTooltip>
-                        </div>
-                    </MudItem>
-                    @foreach (var p in Priorities)
-                    {
-                        var pr = p;
-                        <MudItem xs="6" sm="3">
-                            <MudNumericField T="int" Value="context.Hours[pr]" ValueChanged="v => context.Hours[pr] = v" Min="AdminService.MinSlaHours" Max="AdminService.MaxSlaHours"
-                                             Label="@($"{pr} (h)")" Variant="Variant.Outlined" Margin="Margin.Dense" HideSpinButtons="true" aria-label="@($"{pr} SLA hours for {context.Name}")" />
-                        </MudItem>
-                    }
-                </MudGrid>
-            </MudPaper>
-        }
-    </div>
+<MudTabs @key="_gen" MinimumTabWidth="72px" Class="mb-4" Elevation="0" Rounded="true" TabPanelsClass="pt-4" ApplyEffectsToContainer="true">
+    <MudTabPanel Text="Categories"><CategoriesPanel /></MudTabPanel>
+    <MudTabPanel Text="Districts"><DistrictsPanel /></MudTabPanel>
+    <MudTabPanel Text="Users"><UsersPanel /></MudTabPanel>
+    <MudTabPanel Text="Audit"><AuditPanel /></MudTabPanel>
+</MudTabs>
 
-    <MudPaper Class="panel pa-4 pa-sm-5 mb-6" Elevation="0">
-        <MudText Typo="Typo.h6" Class="mb-3">Add category</MudText>
-        <MudGrid Spacing="2">
-            <MudItem xs="12" sm="6" lg="3"><MudTextField T="string" @bind-Value="_new.Name" Label="Name" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
-            <MudItem xs="12" sm="6" lg="3"><MudTextField T="string" @bind-Value="_new.Department" Label="Department" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
-            @foreach (var p in Priorities)
-            {
-                var pr = p;
-                <MudItem xs="6" sm="3" lg="1"><MudNumericField T="int" Value="_new.Hours[pr]" ValueChanged="v => _new.Hours[pr] = v" Label="@($"{pr} h")" Variant="Variant.Outlined" Margin="Margin.Dense" HideSpinButtons="true" /></MudItem>
-            }
-            <MudItem xs="12" lg="2"><MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" OnClick="() => SaveAsync(_new)" StartIcon="@Icons.Material.Rounded.Add">Add</MudButton></MudItem>
-        </MudGrid>
-    </MudPaper>
-
-    <MudPaper Class="panel pa-4 pa-sm-5" Elevation="0" Style="border-color: var(--mud-palette-warning)">
+<MudPaper Class="panel pa-4 pa-sm-5" Elevation="0" Style="border-color: var(--mud-palette-warning)">
         <div class="d-flex flex-wrap align-center justify-space-between gap-3">
             <div>
                 <MudText Typo="Typo.h6">Reset demo data</MudText>
@@ -71,50 +29,12 @@ else
             <MudButton Variant="Variant.Outlined" Color="Color.Warning" StartIcon="@Icons.Material.Rounded.RestartAlt" OnClick="ResetAsync" Disabled="_resetting">Reset demo data</MudButton>
         </div>
     </MudPaper>
-}
 
 @code {
     [CascadingParameter] private Task<AuthenticationState>? Auth { get; set; }
 
-    private static readonly RequestPriority[] Priorities = Enum.GetValues<RequestPriority>();
-    private List<Row>? _rows;
-    private Row _new = Row.Blank();
     private bool _resetting;
-
-    private sealed class Row
-    {
-        public int? Id { get; init; }
-        public string Name { get; set; } = "";
-        public string Department { get; set; } = "";
-        public bool IsActive { get; set; } = true;
-        public int RequestCount { get; init; }
-        public Dictionary<RequestPriority, int> Hours { get; init; } = [];
-
-        public static Row Blank() => new() { Hours = Priorities.ToDictionary(p => p, p => p switch { RequestPriority.Low => 240, RequestPriority.Normal => 120, RequestPriority.High => 48, _ => 24 }) };
-    }
-
-    protected override async Task OnInitializedAsync() => await LoadAsync();
-
-    private async Task LoadAsync()
-    {
-        _rows = (await Svc.GetCategoriesAsync()).Select(c => new Row
-        {
-            Id = c.Id, Name = c.Name, Department = c.Department, IsActive = c.IsActive, RequestCount = c.RequestCount,
-            Hours = Priorities.ToDictionary(p => p, p => c.SlaHours.GetValueOrDefault(p))
-        }).ToList();
-    }
-
-    private async Task SaveAsync(Row r)
-    {
-        var actor = Actor.From((await Auth!).User);
-        var res = await Svc.SaveCategoryAsync(actor, r.Id, r.Name, r.Department, r.IsActive, r.Hours);
-        Snackbar.Add(res.Ok ? $"Saved {r.Name}." : res.Message ?? "Could not save.", res.Ok ? Severity.Success : Severity.Error);
-        if (res.Ok)
-        {
-            if (r.Id is null) _new = Row.Blank();
-            await LoadAsync();
-        }
-    }
+    private int _gen;
 
     private async Task ResetAsync()
     {
@@ -127,7 +47,7 @@ else
         {
             var res = await Svc.ResetDemoDataAsync(Actor.From((await Auth!).User));
             Snackbar.Add(res.Ok ? "Demo data was reset." : res.Message ?? "Reset failed.", res.Ok ? Severity.Success : Severity.Error);
-            await LoadAsync();
+            _gen++;
         }
         catch (Exception)
         {

@@ -76,5 +76,5 @@ public sealed class RequestQueryService(IDbContextFactory<CivicOpsDb> factory, T
 
     private static IQueryable<RequestRow> Project(IQueryable<ServiceRequest> src) =>
         src.Select(r => new RequestRow(r.Id, r.Number, r.Title, r.Category!.Name, r.District!.Name, r.Priority, r.Status,
-            r.Assignee != null ? r.Assignee.DisplayName : null, r.CreatedAt, r.DueAt, r.ResolvedAt));
+            r.Assignee != null ? r.Assignee.DisplayName : null, r.CreatedAt, r.DueAt, r.ResolvedAt, r.AssigneeId));
 }

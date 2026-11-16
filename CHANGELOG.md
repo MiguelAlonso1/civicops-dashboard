@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.2.0 - 2026-11-16 - Full CRUD with role-based permissions
+
+- Requests: new "New request" page (`/requests/new`) and full edit page (`/requests/{id}/edit`) with validation (title, description, category, district, priority, address, requester). The SLA due date is computed from the category and priority and recomputed on edit. Admin-only hard delete with a confirmation dialog; creation and edits are logged as timeline events (new `Edited` event kind). Buttons on the requests grid and the detail page.
+- Notes: authors (and Admins) can edit or delete their own note events; status and system events are protected. Edited notes show "(edited)".
+- Categories: Admin hard delete, blocked with a "deactivate instead" message while any request references the category.
+- Districts: Admin create, edit and delete (blocked while referenced), on the Admin page.
+- Users: Admin tab to list, create (email, display name, role, temporary password), change role, lock/unlock (soft disable) and delete users through ASP.NET Identity `UserManager`. Cannot delete, lock or demote yourself; the last Admin cannot be deleted, demoted or locked. Locked users cannot use one-click demo logins either.
+- Audit log: hard deletes (requests, notes, categories, districts) and user changes are recorded in a new `AuditLogs` table, shown on the Admin page.
+- Admin page reorganised into tabs (Categories, Districts, Users, Audit).
+- Schema: new `AuditLogs` table and `RequestEvents.ActorId/EditedAt`. Because the app uses `EnsureCreated`, a schema version is stored in SQLite `PRAGMA user_version`; on mismatch at startup the demo database is recreated and reseeded (logged as a warning). Existing databases (local and host) are therefore reset once on first start of 1.2.0.
+- Tests: service-level tests for create/edit/delete, permission denials per role, delete-blocking, last-Admin protection and the schema-version reset.
+
 ## 1.1.0 - 2026-11-16 - Deployment to production slot
 
 - Deploys to the shared host's `PEM/` site folder (replacing the retired old app). Workflow gains a `clean_target` dispatch input that removes stale files (keeping App_Data, .well-known, logs) after the site is offline.
