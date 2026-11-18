@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.1 - 2026-11-18 - AI provider abstraction: Google Gemini (free tier) and Claude
+
+- New `IAiProvider` (structured JSON completion with a JSON schema, streaming text) with `GeminiProvider` and `AnthropicProvider` (the previous Claude code, unchanged in behavior). `AiService` keeps permissions, limits, audit and validation provider-agnostic.
+- Gemini via the native `generateContent` / `streamGenerateContent?alt=sse` API, key in the `x-goog-api-key` header, schema-constrained JSON (`responseMimeType` + `responseJsonSchema`), default model `gemini-3.5-flash-lite`. Quota (429), key/access (403), 5xx and safety blocks map to friendly messages.
+- Config: `Ai:Provider` (`Gemini` default or `Anthropic`), `Ai:Gemini:ApiKey|Model`, `Ai:Anthropic:ApiKey|Model` (old `Claude:*` keys still work), `Ai:DailyLimit`, `Ai:TimeoutSeconds` (fall back to `Claude:*`). The disabled state is keyed to the selected provider.
+- CI: the deploy job injects `Ai__Gemini__ApiKey` (secret `GEMINI_API_KEY`), `Claude__ApiKey` (secret `ANTHROPIC_API_KEY`) and `Ai__Provider` (repo variable `AI_PROVIDER`) only when set; never echoed, never in the build artifact.
+- Tests: fake-handler tests for the Gemini request shape, header, JSON parsing, SSE chunks, error mapping and provider selection.
+
 ## 1.3.0 - 2026-11-18 - AI Assist (Claude)
 
 - New request form: **Suggest with AI** reads the title and description and proposes a category (from the live category list), priority, district (if inferable), a one-line summary and a short rationale. The answer is requested as schema-constrained JSON and validated server-side; unknown categories, priorities or districts are rejected. Shown in a card with **Apply suggestions**; nothing is ever submitted automatically.

@@ -44,7 +44,7 @@ public class AiTests(TestApp app) : IClassFixture<TestApp>
 
     private AiService Make(FakeHandler h, string? key = "test-key", string? daily = null, string? model = null)
     {
-        var cfg = new Dictionary<string, string?> { ["Claude:ApiKey"] = key, ["Claude:DailyLimit"] = daily, ["Claude:Model"] = model };
+        var cfg = new Dictionary<string, string?> { ["Ai:Provider"] = "Anthropic", ["Claude:ApiKey"] = key, ["Claude:DailyLimit"] = daily, ["Claude:Model"] = model };
         return new AiService(app.Db, new Factory(h), new ConfigurationBuilder().AddInMemoryCollection(cfg).Build(), TimeProvider.System, NullLogger<AiService>.Instance);
     }
 
@@ -304,11 +304,11 @@ public class AiTests(TestApp app) : IClassFixture<TestApp>
     [Fact]
     public void Sse_line_parser_handles_noise()
     {
-        Assert.Null(AiService.ParseSseLine("event: content_block_delta"));
-        Assert.Null(AiService.ParseSseLine(""));
-        Assert.Null(AiService.ParseSseLine("data: not json"));
-        Assert.Null(AiService.ParseSseLine("data: [DONE]"));
-        Assert.Equal("x", AiService.ParseSseLine("data: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"x\"}}"));
+        Assert.Null(AnthropicProvider.ParseSseLine("event: content_block_delta"));
+        Assert.Null(AnthropicProvider.ParseSseLine(""));
+        Assert.Null(AnthropicProvider.ParseSseLine("data: not json"));
+        Assert.Null(AnthropicProvider.ParseSseLine("data: [DONE]"));
+        Assert.Equal("x", AnthropicProvider.ParseSseLine("data: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"x\"}}"));
     }
 
     [Fact]

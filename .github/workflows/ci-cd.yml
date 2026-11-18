@@ -82,14 +82,16 @@ jobs:
           echo "SERVER_DIR=$DIR/" >> "$GITHUB_ENV"
           echo "Deploying to folder: $DIR/"
 
-      # Optional AI Assist key. Injected only here (deploy job) and never into the uploaded build artifact, because artifacts of a public repo are downloadable.
-      # Skipped when the secret is empty: the app then shows the AI buttons disabled. The key is read from the environment and never echoed.
-      - name: Configure Claude API key (optional)
+      # Optional AI Assist config. Injected only here (deploy job) and never into the uploaded build artifact, because artifacts of a public repo are downloadable.
+      # Each value is added only when set; with no key for the selected provider the app shows the AI buttons disabled. Values are read from the environment and never echoed.
+      - name: Configure AI Assist (optional)
         env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          AI_PROVIDER: ${{ vars.AI_PROVIDER }}
         run: |
-          if [ -z "$ANTHROPIC_API_KEY" ]; then
-            echo "ANTHROPIC_API_KEY secret not set: AI Assist stays disabled on the site."
+          if [ -z "$GEMINI_API_KEY" ] && [ -z "$ANTHROPIC_API_KEY" ] && [ -z "$AI_PROVIDER" ]; then
+            echo "No AI secrets or variables set: AI Assist stays disabled on the site."
             exit 0
           fi
           python3 - <<'PY'
@@ -102,13 +104,20 @@ jobs:
           env = node.find("environmentVariables")
           if env is None:
               env = ET.SubElement(node, "environmentVariables")
-          for e in list(env):
-              if e.get("name") == "Claude__ApiKey":
-                  env.remove(e)
-          ET.SubElement(env, "environmentVariable", {"name": "Claude__ApiKey", "value": os.environ["ANTHROPIC_API_KEY"]})
+          pairs = [("Ai__Gemini__ApiKey", "GEMINI_API_KEY"), ("Claude__ApiKey", "ANTHROPIC_API_KEY"), ("Ai__Provider", "AI_PROVIDER")]
+          added = []
+          for name, src in pairs:
+              value = os.environ.get(src, "").strip()
+              if not value:
+                  continue
+              for e in list(env):
+                  if e.get("name") == name:
+                      env.remove(e)
+              ET.SubElement(env, "environmentVariable", {"name": name, "value": value})
+              added.append(name)
           tree.write(path, encoding="utf-8", xml_declaration=True)
+          print("Added to web.config: " + ", ".join(added))
           PY
-          echo "Claude__ApiKey added to web.config."
 
       # Why lftp and not FTP-Deploy-Action: the host's IIS FTP requires TLS session reuse on data connections;
       # basic-ftp (used by the action) does not do it and fails with ECONNRESET (data socket). lftp/curl handle it.

@@ -39,7 +39,8 @@ builder.Services.AddScoped<DashboardService>();
 builder.Services.AddScoped<AdminService>();
 builder.Services.AddScoped<UserAdminService>();
 builder.Services.AddHttpClient(AiService.HttpClientName);
-builder.Services.AddSingleton<AiService>();
+builder.Services.AddSingleton<IAiProvider>(sp => AiConfig.Create(sp.GetRequiredService<IHttpClientFactory>(), sp.GetRequiredService<IConfiguration>(), sp.GetRequiredService<ILoggerFactory>().CreateLogger("Ai")));
+builder.Services.AddSingleton(sp => new AiService(sp.GetRequiredService<IDbContextFactory<CivicOpsDb>>(), sp.GetRequiredService<IAiProvider>(), sp.GetRequiredService<IConfiguration>(), sp.GetRequiredService<TimeProvider>()));
 
 builder.Services.AddDataProtection()
     .SetApplicationName("CivicOps")

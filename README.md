@@ -19,7 +19,7 @@ Built with .NET 11, Blazor (Interactive Server), MudBlazor, EF Core + SQLite and
 - **Requests**: `MudDataGrid` with server-side paging, sorting and filtering (search, status, priority, category, district), quick filters (open, overdue, unassigned, assigned to me, high priority), status chips, and **CSV export** through a server endpoint (a plain download link, no JS). Exports neutralize spreadsheet formulas.
 - **Request detail**: `MudTimeline` of status changes, assignments and notes; assignment; validated status-update form that enforces the workflow (notes required for hold, resolve, cancel and reopen).
 - **Full CRUD with role-based permissions**: create and edit requests (SLA due date computed from category and priority), Admin-only delete with confirmation and an audit trail, edit/delete your own notes, categories (delete only when unused), districts and users (create, change role, lock/unlock, delete with self and last-Admin protection). All rules are enforced server-side in the services.
-- **AI Assist (Claude)**: "Suggest with AI" on the new-request form (category, priority, district, summary and rationale from the title and description, validated and applied only when you click Apply), and on a request "Draft resident update" (streamed into an editable box, optionally saved as a note) and "Summarize timeline". Admin/Supervisor/Agent only; rate limited and audited; disabled with a tooltip when no API key is configured.
+- **AI Assist (Gemini free tier or Claude)**: "Suggest with AI" on the new-request form (category, priority, district, summary and rationale from the title and description, validated and applied only when you click Apply), and on a request "Draft resident update" (streamed into an editable box, optionally saved as a note) and "Summarize timeline". Admin/Supervisor/Agent only; rate limited and audited; disabled with a tooltip when no API key is configured.
 - **Districts**: map-free breakdown table with workload per 10,000 residents, overdue counts, average resolution time and SLA compliance bars.
 - **Admin**: tabs for categories and per-priority SLA hours, districts, users and the audit log; admin-only **Reset demo data** button.
 - **Auth**: ASP.NET Core Identity cookie sign-in, roles **Admin, Supervisor, Agent, Viewer**, and a "Try the demo" page with one-click logins using plain form posts. Viewer is read-only.
@@ -50,24 +50,31 @@ dotnet test CivicOps.slnx
 ```
 
 ## AI Assist setup
-AI features call the Claude Messages API directly with `HttpClient` (no SDK). They are off until a key is configured.
+AI features call a model provider directly with `HttpClient` (no SDK): **Google Gemini** (default, has a free tier) or **Anthropic Claude**. They are off until a key for the selected provider is configured.
 
 | Setting (env var) | Default | Purpose |
 | --- | --- | --- |
-| `Claude:ApiKey` (`Claude__ApiKey`) | empty | Anthropic API key. Missing: buttons are disabled with "AI features need an API key" |
-| `Claude:Model` (`Claude__Model`) | `claude-haiku-5-5` | Model id |
-| `Claude:DailyLimit` (`Claude__DailyLimit`) | `200` | Global AI calls per UTC day |
-| `Claude:TimeoutSeconds` (`Claude__TimeoutSeconds`) | `30` | Request timeout |
+| `Ai:Provider` (`Ai__Provider`) | `Gemini` | `Gemini` or `Anthropic` |
+| `Ai:Gemini:ApiKey` (`Ai__Gemini__ApiKey`) | empty | Google AI Studio key. Missing: buttons are disabled with "AI features need an API key" |
+| `Ai:Gemini:Model` (`Ai__Gemini__Model`) | `gemini-3.5-flash-lite` | Gemini model id (native `generateContent` API) |
+| `Ai:Anthropic:ApiKey` (`Ai__Anthropic__ApiKey`) | empty | Anthropic key; the older `Claude:ApiKey` / `Claude__ApiKey` still works |
+| `Ai:Anthropic:Model` | `claude-haiku-5-5` | Claude model id (older `Claude:Model` still works) |
+| `Ai:DailyLimit` (`Ai__DailyLimit`) | `200` | Global AI calls per UTC day (falls back to `Claude:DailyLimit`) |
+| `Ai:TimeoutSeconds` | `30` | Request timeout (falls back to `Claude:TimeoutSeconds`) |
 
 Per-user limit is 20 calls per hour. Usage is counted from the audit log, which records "AI triage", "AI draft" and "AI summary" (never the prompt text).
 
-Locally: `dotnet user-secrets` or `$env:Claude__ApiKey="sk-ant-..."` before `dotnet run`. For the deployed site, store the key as a GitHub secret and the next deploy writes it into the published `web.config`:
+**Free Gemini key**: create one at https://aistudio.google.com/apikey. The free tier is rate-limited (the app's own limits keep usage low), and Google may use free-tier prompts to improve its products. The app only ever sends synthetic demo request data.
+
+Locally: `dotnet user-secrets` or `$env:Ai__Gemini__ApiKey="..."` before `dotnet run`. For the deployed site, store the key as a GitHub secret and the next deploy writes it into the published `web.config`:
 
 ```
-gh secret set ANTHROPIC_API_KEY -R MiguelAlonso1/civicops-dashboard
+gh secret set GEMINI_API_KEY -R MiguelAlonso1/civicops-dashboard
+# optional: switch provider (and set ANTHROPIC_API_KEY instead)
+gh variable set AI_PROVIDER --body Anthropic -R MiguelAlonso1/civicops-dashboard
 ```
 
-The key is added in the deploy job only (never in the downloadable build artifact) and is never printed. Without the secret the site simply shows AI disabled.
+Values are added in the deploy job only when set (never in the downloadable build artifact) and are never printed. Without a key the site simply shows AI disabled.
 
 ## Architecture notes
 - **Layers**: Razor pages call small services (`RequestQueryService`, `RequestCommandService`, `DashboardService`, `AdminService`). Each service call takes an `Actor` (id, name, role) and re-checks permissions, so the UI hides actions *and* the server refuses them.
