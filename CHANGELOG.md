@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.3.0 - 2026-11-18 - AI Assist (Claude)
+
+- New request form: **Suggest with AI** reads the title and description and proposes a category (from the live category list), priority, district (if inferable), a one-line summary and a short rationale. The answer is requested as schema-constrained JSON and validated server-side; unknown categories, priorities or districts are rejected. Shown in a card with **Apply suggestions**; nothing is ever submitted automatically.
+- Request detail: **Draft resident update** streams a short polite status update (from title, status, timeline and SLA due date) into an editable text field that can be saved as a note through the normal AddNote flow; **Summarize timeline** gives a bullet summary of long histories.
+- Permissions and safety: Admin, Supervisor and Agent only (Viewer denied), enforced in `AiService`. 20 AI calls per user per hour, global daily cap (`Claude:DailyLimit`, default 200), input length limits, request timeouts and friendly error messages. Each call is written to the audit log ("AI triage", "AI draft", "AI summary", no prompt text).
+- Configuration: `Claude:ApiKey` (env `Claude__ApiKey`), `Claude:Model` (default `claude-haiku-5-5`), `Claude:DailyLimit`, `Claude:TimeoutSeconds`. Without a key the AI buttons are disabled with the tooltip "AI features need an API key"; the app never fails. The system prompt is sent with prompt caching. The Claude Messages API is called with `HttpClient` and `System.Text.Json` (no SDK, no new packages).
+- CI: the deploy job injects `Claude__ApiKey` into the published `web.config` only when the `ANTHROPIC_API_KEY` secret is set (never echoed, never part of the public build artifact).
+- Tests: fake `HttpMessageHandler` tests for triage parsing and validation, Viewer denial, per-user rate limit, daily cap, disabled state without a key, streaming parsing, error mapping and audit logging.
+
 ## 1.2.0 - 2026-11-16 - Full CRUD with role-based permissions
 
 - Requests: new "New request" page (`/requests/new`) and full edit page (`/requests/{id}/edit`) with validation (title, description, category, district, priority, address, requester). The SLA due date is computed from the category and priority and recomputed on edit. Admin-only hard delete with a confirmation dialog; creation and edits are logged as timeline events (new `Edited` event kind). Buttons on the requests grid and the detail page.

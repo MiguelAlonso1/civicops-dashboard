@@ -6,6 +6,7 @@
 @inject TimeProvider Clock
 @inject IDialogService Dialogs
 @inject NavigationManager Nav
+@inject AiService Ai
 
 <PageTitle>@(_d is null ? "Request" : _d.Number) - CivicOps</PageTitle>
 
@@ -91,6 +92,40 @@ else
         </MudItem>
 
         <MudItem xs="12" md="5" lg="4">
+            @if (_me is { CanEdit: true })
+            {
+                <MudPaper Class="panel auto pa-4 pa-sm-5 mb-3" Elevation="0">
+                    <MudText Typo="Typo.h6" Class="mb-1"><MudIcon Icon="@Icons.Material.Rounded.AutoAwesome" Size="Size.Small" Class="mr-1" />AI assist</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-3">@(Ai.IsConfigured ? "Drafts are suggestions: review and edit before saving." : AiService.NoKeyMessage)</MudText>
+                    <div class="d-flex flex-wrap gap-2">
+                        <MudTooltip Text="@(Ai.IsConfigured ? "Write a status update for the resident" : AiService.NoKeyMessage)">
+                            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="DraftAsync" Disabled="@(!Ai.IsConfigured || _aiBusy)" StartIcon="@Icons.Material.Rounded.Edit">Draft resident update</MudButton>
+                        </MudTooltip>
+                        <MudTooltip Text="@(Ai.IsConfigured ? "Summarize the activity timeline" : AiService.NoKeyMessage)">
+                            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="SummarizeAsync" Disabled="@(!Ai.IsConfigured || _aiBusy)" StartIcon="@Icons.Material.Rounded.Summarize">Summarize timeline</MudButton>
+                        </MudTooltip>
+                    </div>
+                    @if (_aiBusy) { <MudProgressLinear Indeterminate="true" Color="Color.Secondary" Class="mt-3" aria-label="Asking the AI" /> }
+                    @if (_aiError is not null)
+                    {
+                        <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-3" ShowCloseIcon="true" CloseIconClicked="() => _aiError = null">@_aiError</MudAlert>
+                    }
+                    @if (_summary is not null)
+                    {
+                        <MudAlert Severity="Severity.Info" Icon="@Icons.Material.Rounded.Summarize" Class="mt-3 ai-summary" ShowCloseIcon="true" CloseIconClicked="() => _summary = null">@_summary</MudAlert>
+                    }
+                    @if (_draft is not null)
+                    {
+                        <MudTextField T="string" @bind-Value="_draft" Label="Resident update (editable)" Lines="7" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mt-3"
+                                      MaxLength="@RequestCommandService.MaxNoteLength" Counter="@RequestCommandService.MaxNoteLength" Disabled="_aiBusy" />
+                        <div class="d-flex flex-wrap gap-2 mt-2">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveDraftAsync" Disabled="@(_aiBusy || string.IsNullOrWhiteSpace(_draft))" StartIcon="@Icons.Material.Rounded.NoteAdd">Save as note</MudButton>
+                            <MudButton Variant="Variant.Text" OnClick="() => _draft = null" Disabled="_aiBusy">Discard</MudButton>
+                        </div>
+                    }
+                </MudPaper>
+            }
+
             <MudPaper Class="panel auto pa-4 pa-sm-5 mb-3" Elevation="0">
                 <MudText Typo="Typo.h6" Class="mb-1">Assignment</MudText>
                 <MudText Class="mb-3"><MudIcon Icon="@Icons.Material.Rounded.Person" Size="Size.Small" Class="mr-1" />@(d.Assignee ?? "Unassigned")</MudText>
@@ -178,6 +213,42 @@ else
         _status.Note = null;
         _status.Current = _d?.Status;
         _loading = false;
+    }
+
+    private bool _aiBusy;
+    private string? _aiError, _draft, _summary;
+
+    private async Task DraftAsync()
+    {
+        if (_d is null) return;
+        _aiBusy = true; _aiError = null; _draft = "";
+        var s = await Ai.BeginDraftAsync(_me, _d);
+        if (!s.Ok) { _aiError = s.Result.Message; _draft = null; _aiBusy = false; return; }
+        try
+        {
+            await foreach (var chunk in s.Chunks!)
+            {
+                _draft += chunk;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (AiException ex) { _aiError = ex.Message; if (string.IsNullOrWhiteSpace(_draft)) _draft = null; }
+        _aiBusy = false;
+    }
+
+    private async Task SummarizeAsync()
+    {
+        _aiBusy = true; _aiError = null; _summary = null;
+        var r = await Ai.SummarizeTimelineAsync(_me, _d);
+        if (r.Ok) _summary = r.Value; else _aiError = r.Result.Message;
+        _aiBusy = false;
+    }
+
+    private async Task SaveDraftAsync()
+    {
+        var r = await Svc.AddNoteAsync(_me, Id, _draft);
+        Report(r, "Note added.");
+        if (r.Ok) { _draft = null; await LoadAsync(); }
     }
 
     private async Task SubmitStatus()

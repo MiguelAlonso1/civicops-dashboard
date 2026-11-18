@@ -38,6 +38,8 @@ builder.Services.AddScoped<RequestCommandService>();
 builder.Services.AddScoped<DashboardService>();
 builder.Services.AddScoped<AdminService>();
 builder.Services.AddScoped<UserAdminService>();
+builder.Services.AddHttpClient(AiService.HttpClientName);
+builder.Services.AddSingleton<AiService>();
 
 builder.Services.AddDataProtection()
     .SetApplicationName("CivicOps")

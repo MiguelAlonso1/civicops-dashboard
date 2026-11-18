@@ -41,7 +41,7 @@ public sealed record Actor(string UserId, string Name, string Role)
     public bool CanModifyNote(string? authorId) => CanEdit && (IsAdmin || (authorId is not null && authorId == UserId));
 }
 
-public enum Failure { None, Forbidden, NotFound, Invalid }
+public enum Failure { None, Forbidden, NotFound, Invalid, Limited, Unavailable }
 
 public readonly record struct OpResult(Failure Failure, string? Message = null)
 {

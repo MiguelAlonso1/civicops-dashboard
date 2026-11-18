@@ -4,6 +4,7 @@
 @inject ISnackbar Snackbar
 @inject NavigationManager Nav
 @inject TimeProvider Clock
+@inject AiService Ai
 
 <PageTitle>@Heading - CivicOps</PageTitle>
 
@@ -65,6 +66,42 @@ else
                     <MudTextField T="string" @bind-Value="_m.RequesterName" Label="Requester name" Immediate="true" Variant="Variant.Outlined" Required="true" RequiredError="Requester name is required." MaxLength="100" />
                 </MudItem>
             </MudGrid>
+            @if (IsNew)
+            {
+                <div class="d-flex flex-wrap align-center gap-3 mt-4">
+                    <MudTooltip Text="@(Ai.IsConfigured ? "Suggest category, priority and district from the title and description" : AiService.NoKeyMessage)">
+                        <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="SuggestAsync" Disabled="@(!Ai.IsConfigured || _aiBusy)"
+                                   StartIcon="@Icons.Material.Rounded.AutoAwesome">Suggest with AI</MudButton>
+                    </MudTooltip>
+                    @if (_aiBusy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" aria-label="Asking the AI" /> }
+                    @if (!Ai.IsConfigured) { <MudText Typo="Typo.caption" Color="Color.Secondary">@AiService.NoKeyMessage</MudText> }
+                </div>
+                @if (_aiError is not null)
+                {
+                    <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-3" ShowCloseIcon="true" CloseIconClicked="() => _aiError = null">@_aiError</MudAlert>
+                }
+                @if (_sug is { } sg)
+                {
+                    <MudCard Outlined="true" Class="mt-3">
+                        <MudCardHeader>
+                            <CardHeaderContent><MudText Typo="Typo.subtitle1"><MudIcon Icon="@Icons.Material.Rounded.AutoAwesome" Size="Size.Small" Class="mr-1" />AI suggestion</MudText></CardHeaderContent>
+                        </MudCardHeader>
+                        <MudCardContent Class="pt-0">
+                            <MudText Class="mb-2">@sg.Summary</MudText>
+                            <div class="d-flex flex-wrap gap-2 mb-2">
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@sg.Category</MudChip>
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="@UiHelpers.PriorityColor(sg.Priority)">@sg.Priority priority</MudChip>
+                                @if (sg.District is not null) { <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@sg.District</MudChip> }
+                            </div>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">@sg.Rationale</MudText>
+                        </MudCardContent>
+                        <MudCardActions Class="px-4 pb-3">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ApplySuggestion" StartIcon="@Icons.Material.Rounded.Check">Apply suggestions</MudButton>
+                            <MudButton Variant="Variant.Text" OnClick="() => _sug = null">Dismiss</MudButton>
+                        </MudCardActions>
+                    </MudCard>
+                }
+            }
             <div class="d-flex flex-wrap gap-2 mt-4">
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync" Disabled="_busy" StartIcon="@Icons.Material.Rounded.Save">@(IsNew ? "Create request" : "Save changes")</MudButton>
                 <MudButton Variant="Variant.Text" Href="@BackHref">Cancel</MudButton>
@@ -134,6 +171,28 @@ else
             }
         }
         _loading = false;
+    }
+
+    private bool _aiBusy;
+    private string? _aiError;
+    private TriageSuggestion? _sug;
+
+    private async Task SuggestAsync()
+    {
+        _aiBusy = true; _aiError = null; _sug = null;
+        var r = await Ai.SuggestTriageAsync(_me, _m.Title, _m.Description);
+        if (r.Ok) _sug = r.Value; else _aiError = r.Result.Message;
+        _aiBusy = false;
+    }
+
+    private void ApplySuggestion()
+    {
+        if (_sug is not { } s) return;
+        _m.CategoryId = s.CategoryId;
+        _m.Priority = s.Priority;
+        if (s.DistrictId is { } d) _m.DistrictId = d;
+        _sug = null;
+        Snackbar.Add("Suggestions applied. Review them before creating the request.", Severity.Info);
     }
 
     private async Task SubmitAsync()

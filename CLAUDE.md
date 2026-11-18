@@ -27,7 +27,7 @@ CivicOps: a government-style service-request and permit operations dashboard (po
 ## Structure
 - `Program.cs` - services, Identity/cookies, authorization (fallback policy = authenticated), HTTPS redirect + HSTS, pipeline, startup seed
 - `Data/` - `Models.cs` (entities, enums, `Roles`), `CivicOpsDb.cs` (Identity DbContext), `DemoDataSeeder.cs` (users + ~500 synthetic requests, deterministic seed, `ResetAsync`)
-- `Services/` - `Domain.cs` (`Actor`, `OpResult`, `StatusRules` workflow), `RequestQuery*.cs` (filter/sort/page), `RequestCommandService.cs` (create/edit/delete/status/assign/notes, permission checks), `DashboardService.cs` (KPIs/series/districts), `AdminService.cs` (categories, districts, audit), `UserAdminService.cs` (Identity users), `CsvExport.cs`
+- `Services/` - `AiService.cs` (Claude Messages API via HttpClient, no SDK: triage with JSON schema, streamed drafts, summaries; role check, per-user/daily limits, audit), `Domain.cs` (`Actor`, `OpResult`, `StatusRules` workflow), `RequestQuery*.cs` (filter/sort/page), `RequestCommandService.cs` (create/edit/delete/status/assign/notes, permission checks), `DashboardService.cs` (KPIs/series/districts), `AdminService.cs` (categories, districts, audit), `UserAdminService.cs` (Identity users), `CsvExport.cs`
 - `Endpoints/` - `AccountEndpoints.cs` (POST `/account/login`, `/account/demo`, `/account/logout`; form posts, no JS), `ExportEndpoints.cs` (GET `/api/requests/export.csv`)
 - `Theme/AppTheme.cs`, `Theme/ThemeEndpoints.cs` - same dark-first navy + indigo/cyan theme and cookie toggle (`/theme/{light|dark}`) as the personal site
 - `Components/` - `App.razor`, `Routes.razor`, `Layout/MainLayout.razor` (interactive shell), `Layout/PublicLayout.razor` (static pages), `Kpi.razor`, `UiHelpers.cs`, `Pages/` (Dashboard, Requests, RequestDetail, Districts, Admin, Login, AccessDenied, NotFound, Error)
@@ -40,6 +40,9 @@ CivicOps: a government-style service-request and permit operations dashboard (po
 - Demo accounts (`admin|supervisor|agent|viewer@civicops.demo`, password `Demo!2026pass`); login page offers one-click demo logins (disable with config `Demo:OneClickLogins=false`).
 - Viewer read-only; Agent creates requests and updates/edits/adds notes only on requests assigned to them (edit not when closed/canceled); Supervisor also assigns and edits any request; Admin also deletes requests, manages categories/SLA rules, districts and users and resets demo data. Authors edit/delete their own notes. Hard deletes write `AuditLogs` rows. Rules are enforced in the services (`Actor` checks), not only in the UI.
 - Static SSR pages (`[ExcludeFromInteractiveRouting]`) must be used for anything reachable before sign-in, because the SignalR hub requires an authenticated user. Their forms need `<AntiforgeryToken />`.
+
+## AI Assist
+- Config `Claude:ApiKey` (env `Claude__ApiKey`), `Claude:Model` (default `claude-haiku-5-5`), `Claude:DailyLimit` (200). No key means disabled buttons, never a crash. Admin/Supervisor/Agent only, 20 calls/user/hour, usage counted from `AuditLogs` ("AI triage"/"AI draft"/"AI summary"). Tests use a fake `HttpMessageHandler` (`AiTests.cs`); never call the live API in tests. The CI secret `ANTHROPIC_API_KEY` is injected into web.config in the deploy job only.
 
 ## Conventions
 - All timestamps UTC `DateTime` (SQLite cannot order `DateTimeOffset`).
