@@ -1,13 +1,13 @@
 # Deployment
 
-CivicOps is built to deploy to the same Windows/IIS shared host as the personal site, under its own subdomain (planned: `ops.alonsomiguel.com`). Deployment is **off** until you enable it.
+CivicOps is built to deploy to the same Windows/IIS shared host as the personal site, under its own subdomain (live: http://ops.alonsomiguel.com, site folder `ops/`). Deployment is **off** until you enable it.
 
 ## One-time setup
 1. Create the subdomain and site folder on the host (for example `ops.alonsomiguel.com/`), point DNS at the host, enable WebSockets and an HTTPS certificate for it.
 2. Give the app pool identity **write** access to the site's `App_Data` folder (SQLite database and data-protection keys live there; the app creates the folder on first start).
 3. In the GitHub repo (Settings > Secrets and variables > Actions) add:
    - Secrets: `FTP_SERVER`, `FTP_USERNAME`, `FTP_PASSWORD`
-   - Variables: `FTP_SERVER_DIR` (site folder, e.g. `ops.alonsomiguel.com/`; the job refuses empty, `.` or `..`), `SITE_URL` (optional, defaults to `https://ops.alonsomiguel.com/health`), `DEPLOY_ENABLED=true` (last)
+   - Variables: `FTP_SERVER_DIR` (site folder `ops/`; the job refuses empty, `.` or `..`), `SITE_URL` (optional, set to `http://ops.alonsomiguel.com/health`), `DEPLOY_ENABLED=true` (last)
 4. Create a GitHub environment named `production` (the deploy job uses it; add required reviewers if you want manual approval).
 
 ## What the workflow does
