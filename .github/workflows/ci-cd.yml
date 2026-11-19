@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       clean_target:
-        description: 'Delete stale files in the target folder (mirror --delete; keeps App_Data, .well-known, logs). Only allowed for PEM/'
+        description: 'Delete stale files in the target folder (mirror --delete; keeps App_Data, .well-known, logs). Only allowed for ops/'
         type: boolean
         default: false
 
@@ -75,8 +75,8 @@ jobs:
               echo "::error::FTP_SERVER_DIR is unset or unsafe ('$RAW_DIR'). Refusing to deploy to the FTP account root. Set it to the site folder, e.g. ops.alonsomiguel.com/"
               exit 1;;
           esac
-          if [ "${{ github.event_name == 'workflow_dispatch' && inputs.clean_target }}" = "true" ] && [ "$DIR/" != "PEM/" ]; then
-            echo "::error::clean_target is only allowed when FTP_SERVER_DIR is exactly PEM/ (got '$DIR/')"
+          if [ "${{ github.event_name == 'workflow_dispatch' && inputs.clean_target }}" = "true" ] && [ "$DIR/" != "ops/" ]; then
+            echo "::error::clean_target is only allowed when FTP_SERVER_DIR is exactly ops/ (got '$DIR/')"
             exit 1
           fi
           echo "SERVER_DIR=$DIR/" >> "$GITHUB_ENV"
@@ -163,11 +163,11 @@ jobs:
           lftp_run "cd \"$SERVER_DIR\" && put -O . ./offline/app_offline.htm"
 
       # Optional one-time clean (workflow_dispatch clean_target=true): wait for the app to release its files, then mirror --delete.
-      # Never touches App_Data/, .well-known/, logs/, app_offline.htm. Hard-asserted to PEM/ only.
+      # Never touches App_Data/, .well-known/, logs/, app_offline.htm. Hard-asserted to ops/ only.
       - name: Clean target folder (optional)
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.clean_target }}
         run: |
-          [ "$SERVER_DIR" = "PEM/" ] || { echo "::error::Refusing clean: SERVER_DIR is '$SERVER_DIR', must be PEM/"; exit 1; }
+          [ "$SERVER_DIR" = "ops/" ] || { echo "::error::Refusing clean: SERVER_DIR is '$SERVER_DIR', must be ops/"; exit 1; }
           sleep 10
           source "$HOME/lftp-run.sh"
           lftp_run "mirror -R --delete --verbose --parallel=2 --no-perms --exclude-glob .well-known/ --exclude-glob App_Data/ --exclude-glob logs/ --exclude-glob app_offline.htm ./publish/ \"$SERVER_DIR\""
