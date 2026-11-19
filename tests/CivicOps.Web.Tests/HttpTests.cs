@@ -104,3 +104,37 @@ public class HttpTests(TestApp app) : IClassFixture<TestApp>
         Assert.Equal("/requests?x=1", AccountEndpoints.SafeReturnUrl("/requests?x=1"));
     }
 }
+
+public class HttpsRedirectTests(TestApp app) : IClassFixture<TestApp>
+{
+    private HttpClient Client(bool redirect = true) => app
+        .WithWebHostBuilder(b => b.UseSetting("Https:Redirect", redirect ? "true" : "false"))
+        .CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false,
+            BaseAddress = new Uri("http://ops.alonsomiguel.com")
+        });
+
+    [Fact]
+    public async Task Http_RedirectsToHttps_PreservingPathAndQuery()
+    {
+        var res = await Client().GetAsync("/requests?x=1");
+        Assert.Equal(HttpStatusCode.MovedPermanently, res.StatusCode);
+        Assert.Equal("https://ops.alonsomiguel.com/requests?x=1", res.Headers.Location?.OriginalString);
+    }
+
+    [Fact]
+    public async Task AcmeChallengeOverHttp_IsNotRedirected()
+    {
+        var res = await Client().GetAsync("/.well-known/acme-challenge/x");
+        Assert.NotEqual(HttpStatusCode.MovedPermanently, res.StatusCode);
+        Assert.DoesNotContain("https://", res.Headers.Location?.OriginalString ?? "");
+    }
+
+    [Fact]
+    public async Task Http_IsServedWhenRedirectIsOff()
+    {
+        var res = await Client(redirect: false).GetAsync("/health");
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+    }
+}
