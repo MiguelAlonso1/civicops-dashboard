@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.2 - 2026-11-19 - User secrets for local AI keys
+
+- Added a `UserSecretsId` to the web project so `dotnet user-secrets set` works (secrets load automatically in Development).
+- README and Rider/DataGrip guide: corrected local AI-key instructions (exact config keys, user secrets, or an `Ai__Gemini__ApiKey` environment variable in a Rider run configuration).
+
 ## 1.3.1 - 2026-11-18 - AI provider abstraction: Google Gemini (free tier) and Claude
 
 - New `IAiProvider` (structured JSON completion with a JSON schema, streaming text) with `GeminiProvider` and `AnthropicProvider` (the previous Claude code, unchanged in behavior). `AiService` keeps permissions, limits, audit and validation provider-agnostic.

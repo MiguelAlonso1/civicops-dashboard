@@ -66,7 +66,18 @@ Per-user limit is 20 calls per hour. Usage is counted from the audit log, which 
 
 **Free Gemini key**: create one at https://aistudio.google.com/apikey. The free tier is rate-limited (the app's own limits keep usage low), and Google may use free-tier prompts to improve its products. The app only ever sends synthetic demo request data.
 
-Locally: `dotnet user-secrets` or `$env:Ai__Gemini__ApiKey="..."` before `dotnet run`. For the deployed site, store the key as a GitHub secret and the next deploy writes it into the published `web.config`:
+Locally (Development), store the key in .NET user secrets (the web project has a `UserSecretsId`; secrets load automatically in Development and stay outside the repo):
+
+```
+dotnet user-secrets set "Ai:Gemini:ApiKey" "<your key>" --project CivicOps.Web.csproj
+# optional, to use Claude instead:
+dotnet user-secrets set "Ai:Provider" "Anthropic" --project CivicOps.Web.csproj
+dotnet user-secrets set "Ai:Anthropic:ApiKey" "<your key>" --project CivicOps.Web.csproj   # the older Claude:ApiKey also works
+```
+
+Alternatively set an environment variable (double underscore = `:`), for example `Ai__Gemini__ApiKey` in a Rider run configuration (Edit Configurations -> Environment variables; untick "Share through VCS"), or `$env:Ai__Gemini__ApiKey="..."` before `dotnet run`.
+
+For the deployed site, store the key as a GitHub secret and the next deploy writes it into the published `web.config`:
 
 ```
 gh secret set GEMINI_API_KEY -R MiguelAlonso1/civicops-dashboard
