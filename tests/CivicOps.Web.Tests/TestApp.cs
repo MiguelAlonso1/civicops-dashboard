@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace CivicOps.Web.Tests;
@@ -23,6 +24,14 @@ public sealed class TestApp : WebApplicationFactory<Program>
         builder.UseEnvironment("Testing");
         builder.UseSetting("ConnectionStrings:Default", _cs);
         builder.UseSetting("Storage:Path", _storage);
+        // Isolate from a developer's user-secrets / env vars: tests set a fake key explicitly when needed.
+        builder.ConfigureAppConfiguration((_, c) => c.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Ai:Provider"] = "Gemini",
+            ["Ai:Gemini:ApiKey"] = "",
+            ["Ai:Anthropic:ApiKey"] = "",
+            ["Claude:ApiKey"] = ""
+        }));
     }
 
     public IDbContextFactory<CivicOpsDb> Db => Services.GetRequiredService<IDbContextFactory<CivicOpsDb>>();
