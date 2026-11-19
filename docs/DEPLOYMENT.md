@@ -21,4 +21,4 @@ If a deployment dies midway the site stays offline behind `app_offline.htm`; the
 
 ## Notes
 - `Demo:OneClickLogins` (config / environment `Demo__OneClickLogins=false`) turns off the one-click demo logins. Demo accounts share the public password `Demo!2026pass`; this is intentional for a synthetic-data demo and must not be reused anywhere real.
-- Logs: set `stdoutLogEnabled="true"` temporarily in `web.config` on the server when diagnosing startup problems.
+- Logs: stdout logging is off (`stdoutLogEnabled="false"`). To diagnose startup failures, temporarily set `stdoutLogEnabled="true"` in `web.config` and redeploy.
