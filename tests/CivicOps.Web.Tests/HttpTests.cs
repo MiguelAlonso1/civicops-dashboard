@@ -36,6 +36,14 @@ public class HttpTests(TestApp app) : IClassFixture<TestApp>
     }
 
     [Fact]
+    public async Task Theme_toggle_is_a_plain_link_with_return_url()
+    {
+        var html = await (await app.NewClient().GetAsync("/login")).Content.ReadAsStringAsync();
+        Assert.Contains("href=\"/theme/light?returnUrl=%2Flogin\"", html);
+        Assert.Contains("data-enhance-nav=\"false\"", html);
+    }
+
+    [Fact]
     public async Task Demo_login_without_antiforgery_token_is_rejected()
     {
         var res = await app.NewClient().PostAsync("/account/demo", new FormUrlEncodedContent(new Dictionary<string, string> { ["role"] = "Admin" }));

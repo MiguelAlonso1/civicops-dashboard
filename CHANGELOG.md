@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.3 - 2026-11-19 - GitHub Actions on Node 24
+
+- CI: checkout v7, setup-dotnet v6, upload-artifact v7, download-artifact v8 (Node 24 runtimes; deploy logic unchanged).
+- Verified the theme toggle is a plain link (`Href` + `data-enhance-nav="false"`, full page load, no NavigationManager or JS); added a test for the rendered link. No other forceLoad navigations exist (logout is a POST form).
+
 ## 1.3.2 - 2026-11-19 - User secrets for local AI keys
 
 - Added a `UserSecretsId` to the web project so `dotnet user-secrets set` works (secrets load automatically in Development).
